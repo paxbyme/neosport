@@ -1,5 +1,6 @@
 import { readSession } from "../../auth-session.mjs";
 import { isAuthConfigured } from "../../auth-service.mjs";
+import { isTelegramAuthConfigured } from "../../telegram-auth.mjs";
 
 export default function handler(request, response) {
   response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -10,9 +11,16 @@ export default function handler(request, response) {
   response.end(
     JSON.stringify({
       ok: true,
-      // The page needs to know whether to show the button at all.
+      // The pages only show a button for a method that is actually configured.
       googleEnabled: isAuthConfigured(),
-      user: session && { email: session.email, name: session.name, picture: session.picture, role: session.role },
+      telegramEnabled: isTelegramAuthConfigured(),
+      user: session && {
+        email: session.email,
+        phone: session.phone,
+        name: session.name,
+        picture: session.picture,
+        role: session.role,
+      },
     }),
   );
 }

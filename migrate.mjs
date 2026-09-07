@@ -8,7 +8,11 @@ for (const filename of [".env.local", ".env"]) {
   for (const line of readFileSync(filename, "utf8").split(/\r?\n/)) {
     const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
     if (!match || process.env[match[1]] !== undefined) continue;
-    process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+    const value = match[2].replace(/^(['"])(.*)\1$/, "$2");
+    // `vercel env pull` writes this for production secrets it may not reveal;
+    // treating it as a value would hide the real one in a later file.
+    if (value === "[SENSITIVE]") continue;
+    process.env[match[1]] = value;
   }
 }
 

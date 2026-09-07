@@ -51,6 +51,22 @@ create index if not exists orders_user_id_idx on public.orders (user_id);
 -- Statistics read the newest orders first.
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 
+-- One row per Telegram sign-in attempt. The browser holds the token in an
+-- HttpOnly cookie; the bot fills in who verified it.
+create table if not exists public.login_tokens (
+  token text primary key,
+  created_at timestamptz not null default now(),
+  status text not null default 'pending' check (status in ('pending', 'verified', 'used')),
+  chat_id text,
+  phone text,
+  full_name text,
+  next_path text not null default '/'
+);
+
+create index if not exists login_tokens_created_at_idx on public.login_tokens (created_at);
+
+alter table public.login_tokens enable row level security;
+
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 

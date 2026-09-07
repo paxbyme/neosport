@@ -131,14 +131,20 @@ button { -webkit-tap-highlight-color: transparent; }
 .login-card > p:first-of-type { margin: 0 0 7px; color: var(--lime); font-size: 8px; font-weight: 800; letter-spacing: .18em; text-align: center; }
 .login-card h2 { margin: 0 0 30px; font: 900 46px/1 var(--display); text-align: center; }
 .login-card button { width: 100%; height: 52px; margin-top: 12px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; color: var(--ink); background: var(--lime); border: 0; cursor: pointer; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-.google-button { width: 100%; min-height: 52px; margin-top: 6px; display: flex; align-items: center; justify-content: center; gap: 11px; color: var(--ink); background: var(--white); border: 0; cursor: pointer; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.google-button { width: 100%; min-height: 64px; margin-top: 6px; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--ink); background: var(--white); border: 0; cursor: pointer; font-size: 13px; font-weight: 800; letter-spacing: .04em; }
 .google-button:hover { background: var(--lime); }
-.google-button svg { flex: none; }
+.google-button svg { flex: none; width: 22px; height: 22px; }
+.telegram-button { width: 100%; min-height: 64px; margin-top: 9px; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--white); background: transparent; border: 1px solid var(--line); cursor: pointer; font-size: 13px; font-weight: 700; letter-spacing: .04em; }
+.telegram-button:hover { border-color: #2AABEE; }
+.telegram-button svg { flex: none; width: 22px; height: 22px; }
+.login-or { margin: 14px 0 0; color: var(--muted); font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: .12em; }
+.login-waiting { margin: 12px 0 0; padding: 12px; color: var(--lime); border: 1px solid rgba(168, 249, 0, .3); background: rgba(168, 249, 0, .06); font-size: 10px; line-height: 1.6; text-align: center; }
+
 .login-password { margin-top: 14px; }
 .login-password[hidden] { display: none !important; }
 
 .login-status { min-height: 16px; margin: 9px 0 0; color: #ff7968; font-size: 9px; text-align: center; }
-.login-card > a { margin-top: 20px; display: block; color: var(--muted); font-size: 9px; text-align: center; }
+.login-card > .login-back { margin-top: 20px; display: block; color: var(--muted); font-size: 9px; text-align: center; }
 
 /* ----------------------------------------------------------- statistics -- */
 

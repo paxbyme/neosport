@@ -33,6 +33,9 @@ export const supabaseRequest = async (config, path, options = {}) => {
     throw new SupabaseError(`Supabase request failed with ${response.status}`);
   }
 
+  // `Prefer: return=minimal` answers 201 with an empty body, so parsing
+  // unconditionally would throw on every successful insert.
   if (response.status === 204) return null;
-  return response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 };

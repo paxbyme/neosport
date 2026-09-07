@@ -7,6 +7,9 @@ import authCallbackHandler from "./api/auth/callback.mjs";
 import authLoginHandler from "./api/auth/login.mjs";
 import authLogoutHandler from "./api/auth/logout.mjs";
 import authMeHandler from "./api/auth/me.mjs";
+import telegramStartHandler from "./api/auth/telegram/start.mjs";
+import telegramStatusHandler from "./api/auth/telegram/status.mjs";
+import telegramWebhookHandler from "./api/telegram/webhook.mjs";
 import orderHandler from "./api/order.mjs";
 import ordersHandler from "./api/orders.mjs";
 import productsHandler from "./api/products.mjs";
@@ -16,7 +19,11 @@ for (const filename of [".env.local", ".env"]) {
   for (const line of readFileSync(filename, "utf8").split(/\r?\n/)) {
     const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
     if (!match || process.env[match[1]] !== undefined) continue;
-    process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+    const value = match[2].replace(/^(['"])(.*)\1$/, "$2");
+    // `vercel env pull` writes this for production secrets it may not reveal;
+    // treating it as a value would hide the real one in a later file.
+    if (value === "[SENSITIVE]") continue;
+    process.env[match[1]] = value;
   }
 }
 
@@ -67,6 +74,9 @@ createServer(async (request, response) => {
     "/api/auth/callback": authCallbackHandler,
     "/api/auth/logout": authLogoutHandler,
     "/api/auth/me": authMeHandler,
+    "/api/auth/telegram/start": telegramStartHandler,
+    "/api/auth/telegram/status": telegramStatusHandler,
+    "/api/telegram/webhook": telegramWebhookHandler,
   }[pathname];
 
   if (apiHandler) {

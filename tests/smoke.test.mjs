@@ -6,9 +6,19 @@ import { requireAdmin } from "../admin-auth.mjs";
 import { createTelegramOrder } from "../order-service.mjs";
 import { createProduct, effectivePrice, MAX_DISCOUNT_PERCENT, MAX_IMAGES, updateProduct } from "../product-service.mjs";
 import { buildStats } from "../stats-service.mjs";
-import { createSessionCookie, isAdminEmail, readSession, safeNextPath, SESSION_COOKIE } from "../auth-session.mjs";
+import {
+  createSessionCookie,
+  isAdminEmail,
+  isAdminPhone,
+  normalizePhone,
+  readSession,
+  safeNextPath,
+  SESSION_COOKIE,
+} from "../auth-session.mjs";
+import { callTelegram, isTelegramAuthConfigured, verifyWebhookSecret } from "../telegram-auth.mjs";
 import { callbackUrl, googleAuthorizeUrl, isAuthConfigured } from "../auth-service.mjs";
 import { resetRateLimits } from "../rate-limit.mjs";
+import { supabaseRequest } from "../supabase.mjs";
 
 const fakeRequest = (headers = {}) => ({ headers, socket: { remoteAddress: "203.0.113.7" } });
 
@@ -1006,4 +1016,116 @@ test("footwear is sized in EU numbers and clothing in letters", () => {
   const service = read("product-service.mjs");
   assert.match(service, /\/\^\[A-Z0-9\]\{1,4\}\$\//);
   assert.match(read("script.js"), /\/\^\[A-Z0-9\]\{1,4\}\$\//);
+});
+
+/* -------------------------------------------------------- Telegram login -- */
+
+test("phone numbers match however they are written", () => {
+  for (const spelling of ["+998 90 123 45 67", "998901234567", "90 123 45 67", "(90) 123-45-67"]) {
+    assert.equal(normalizePhone(spelling), "998901234567", `${spelling} must normalise`);
+  }
+  assert.equal(normalizePhone(""), "");
+  assert.equal(normalizePhone(null), "");
+
+  const environment = { ADMIN_PHONES: "+998 90 123 45 67, 998911112233" };
+  assert.equal(isAdminPhone("998901234567", environment), true);
+  assert.equal(isAdminPhone("901234567", environment), true, "a local nine-digit number is the same person");
+  assert.equal(isAdminPhone("998900000000", environment), false);
+  assert.equal(isAdminPhone("", environment), false);
+});
+
+test("a Telegram session carries a phone instead of an email", () => {
+  const environment = {
+    SESSION_SECRET: "a-test-secret-that-is-long-enough-to-pass",
+    ADMIN_PHONES: "998901234567",
+  };
+  const telegramUser = { id: "tg:551", phone: "998901234567", name: "Pax", email: "", picture: "" };
+  const cookie = asCookieHeader(createSessionCookie(telegramUser, { environment }));
+
+  const session = readSession(fakeRequest({ cookie }), environment);
+  assert.equal(session.id, "tg:551");
+  assert.equal(session.phone, "998901234567");
+  assert.equal(session.email, "");
+  assert.equal(session.role, "admin");
+
+  // Same rule as email: dropping the number revokes admin immediately.
+  const demoted = readSession(fakeRequest({ cookie }), { ...environment, ADMIN_PHONES: "998900000000" });
+  assert.equal(demoted.role, "customer");
+
+  // A session with neither an email nor a phone is not a session.
+  const empty = createSessionCookie({ id: "x", email: "", phone: "" }, { environment });
+  assert.equal(readSession(fakeRequest({ cookie: asCookieHeader(empty) }), environment), null);
+});
+
+test("the Telegram webhook refuses anything without the shared secret", () => {
+  const environment = { TELEGRAM_WEBHOOK_SECRET: "a-webhook-secret-value" };
+
+  assert.doesNotThrow(() =>
+    verifyWebhookSecret(fakeRequest({ "x-telegram-bot-api-secret-token": "a-webhook-secret-value" }), environment),
+  );
+  assert.throws(
+    () => verifyWebhookSecret(fakeRequest({ "x-telegram-bot-api-secret-token": "wrong" }), environment),
+    /mos kelmadi/,
+  );
+  assert.throws(() => verifyWebhookSecret(fakeRequest({}), environment), /mos kelmadi/);
+
+  // With no secret configured the endpoint is closed, not open.
+  assert.throws(
+    () => verifyWebhookSecret(fakeRequest({ "x-telegram-bot-api-secret-token": "anything" }), {}),
+    /sozlanmagan/,
+  );
+
+  assert.equal(isTelegramAuthConfigured({}), false);
+
+  // An unconfigured bot reports 503 "not set up", never a 502 network error.
+  assert.rejects(() => callTelegram("getMe", {}, {}), (error) => error.status === 503 && /sozlanmagan/.test(error.message));
+  assert.equal(
+    isTelegramAuthConfigured({
+      TELEGRAM_BOT_TOKEN: "123:abc",
+      SUPABASE_URL: "https://x.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "key",
+    }),
+    true,
+  );
+});
+
+test("the Telegram flow is stateless and only accepts your own contact", () => {
+  const webhook = read("api/telegram/webhook.mjs");
+
+  // /start and the shared contact arrive as separate webhook calls that may run
+  // on different instances, so the link between them lives in the database.
+  assert.match(webhook, /attachChatToToken/);
+  assert.match(webhook, /findPendingTokenForChat/);
+  assert.doesNotMatch(webhook, /new Map\(\)/, "no in-memory state between webhook calls");
+
+  // Sharing somebody else's contact card must not sign you in as them.
+  assert.match(webhook, /contact\.user_id[\s\S]{0,80}message\.from\?\.id/);
+
+  // A token is spent once: the update is filtered on the status it must have.
+  assert.match(read("telegram-auth.mjs"), /status=eq\.verified/);
+  assert.match(read("telegram-auth.mjs"), /status: "used"/);
+
+  // The pages offer whichever methods the server reports.
+  assert.match(read("api/auth/me.mjs"), /telegramEnabled/);
+  assert.match(read("admin.js"), /telegramSignin/);
+  assert.match(script, /data-telegram-signin/);
+});
+
+test("a minimal Supabase response is not mistaken for a failure", async () => {
+  // Inserts sent with `Prefer: return=minimal` come back 201 with no body.
+  // Parsing that unconditionally threw, which silently lost every stored order.
+  const config = { url: "https://x.supabase.co", serviceKey: "key" };
+
+  for (const [status, body] of [
+    [201, ""],
+    [204, null],
+    [200, JSON.stringify([{ id: 1 }])],
+  ]) {
+    const result = await withStubbedFetch(
+      async () => new Response(body, { status, headers: body ? { "Content-Type": "application/json" } : {} }),
+      () => supabaseRequest(config, "/rest/v1/anything", { method: "POST" }),
+    );
+    if (status === 200) assert.deepEqual(result, [{ id: 1 }]);
+    else assert.equal(result, null, `${status} with an empty body must resolve, not throw`);
+  }
 });

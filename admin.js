@@ -24,6 +24,8 @@ const statsBody = document.querySelector("#stats-body");
 const statsRefresh = document.querySelector("#stats-refresh");
 const googleSignin = document.querySelector("#google-signin");
 const loginPassword = document.querySelector("#login-password");
+const telegramSignin = document.querySelector("#telegram-signin");
+const loginOr = document.querySelector("#login-or");
 const AUTH_STORAGE_KEY = "neosport-admin-session";
 const MAX_DISCOUNT_PERCENT = 90;
 const MAX_IMAGES = 10;
@@ -103,6 +105,49 @@ const apiRequest = async (path, options = {}) => {
   }
   return result;
 };
+
+/**
+ * The bot conversation happens in another tab, so this page waits for the
+ * server to report that the token it holds has been verified. The token lives
+ * in an HttpOnly cookie, which is why the server answers `waiting` rather than
+ * the page checking for itself.
+ */
+const checkTelegramLogin = async () => {
+  try {
+    const response = await fetch("/api/auth/telegram/status", { headers: { Accept: "application/json" } });
+    if (!response.ok) return false;
+    const result = await response.json();
+    if (result.ready) {
+      window.location.href = result.next || "/admin";
+      return false;
+    }
+    return Boolean(result.waiting);
+  } catch {
+    return false;
+  }
+};
+
+let telegramPolling = false;
+
+const waitForTelegram = async () => {
+  if (telegramPolling) return;
+  telegramPolling = true;
+  loginStatus.textContent = "Telegram’da telefon raqamingizni ulashing — bu sahifa o‘zi yangilanadi.";
+
+  // Ten minutes, matching how long the login token stays valid.
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    if (!(await checkTelegramLogin())) break;
+  }
+  telegramPolling = false;
+};
+
+telegramSignin?.addEventListener("click", (event) => {
+  event.preventDefault();
+  // Opened in a new tab so this one stays alive to notice the result.
+  window.open(telegramSignin.href, "_blank", "noopener");
+  waitForTelegram();
+});
 
 const showLogin = (message = "") => {
   adminPanel.hidden = true;
@@ -653,15 +698,24 @@ const start = async () => {
   }
 
   googleSignin.hidden = !auth.googleEnabled;
-  // The password form is offered only while Google sign-in is unavailable.
-  loginPassword.hidden = auth.googleEnabled;
+  telegramSignin.hidden = !auth.telegramEnabled;
+  loginOr.hidden = !(auth.googleEnabled && auth.telegramEnabled);
+  // The password form is offered only while no social sign-in is available.
+  loginPassword.hidden = auth.googleEnabled || auth.telegramEnabled;
 
   if (auth.user?.role === "admin") {
     return showAdmin().catch((error) => showLogin(error.message));
   }
 
   if (auth.user) {
-    return showLogin(`${auth.user.email} — bu hisobda admin huquqi yo‘q.`);
+    const who = auth.user.email || auth.user.phone || "Bu hisob";
+    return showLogin(`${who} — bu hisobda admin huquqi yo‘q.`);
+  }
+
+  // Returning to this tab after talking to the bot: pick the flow back up.
+  if (await checkTelegramLogin()) {
+    showLogin();
+    return waitForTelegram();
   }
 
   if (adminPassword) {

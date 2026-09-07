@@ -67,7 +67,8 @@ export const createSessionCookie = (user, { request, environment = process.env }
   const payload = base64url(
     JSON.stringify({
       sub: user.id,
-      email: user.email,
+      email: user.email || "",
+      phone: user.phone || "",
       name: user.name || "",
       picture: user.picture || "",
       iat: now,
@@ -103,18 +104,43 @@ export const readSession = (request, environment = process.env) => {
     return null;
   }
 
-  if (!claims?.sub || !claims?.email) return null;
+  // Google gives an email, Telegram gives a phone; one of them must be there.
+  if (!claims?.sub || !(claims.email || claims.phone)) return null;
   if (Number(claims.exp) <= Math.floor(Date.now() / 1000)) return null;
+
+  const email = String(claims.email || "").toLowerCase();
+  const phone = normalizePhone(claims.phone);
 
   return {
     id: claims.sub,
-    email: String(claims.email).toLowerCase(),
+    email,
+    phone,
     name: claims.name || "",
     picture: claims.picture || "",
-    // The role is never taken from the cookie: removing an address from
-    // ADMIN_EMAILS has to revoke access immediately, not when the session ends.
-    role: isAdminEmail(claims.email, environment) ? "admin" : "customer",
+    // The role is never taken from the cookie: removing an entry from
+    // ADMIN_EMAILS or ADMIN_PHONES has to revoke access immediately, not when
+    // the session ends.
+    role: isAdminEmail(email, environment) || isAdminPhone(phone, environment) ? "admin" : "customer",
   };
+};
+
+// Uzbek numbers get written +998 90 123 45 67, 998901234567 or 901234567;
+// comparing digits only means every spelling of the same number matches.
+export const normalizePhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length === 9 ? `998${digits}` : digits;
+};
+
+export const adminPhones = (environment = process.env) =>
+  String(environment.ADMIN_PHONES || "")
+    .split(",")
+    .map((phone) => normalizePhone(phone))
+    .filter(Boolean);
+
+export const isAdminPhone = (phone, environment = process.env) => {
+  const normalized = normalizePhone(phone);
+  return Boolean(normalized) && adminPhones(environment).includes(normalized);
 };
 
 export const adminEmails = (environment = process.env) =>

@@ -569,28 +569,87 @@ const GOOGLE_MARK = `
     <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
   </svg>`;
 
+const TELEGRAM_MARK = `
+  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+    <path fill="#2AABEE" d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Z" />
+    <path fill="#fff" d="M5.5 11.9c3.5-1.5 5.8-2.5 7-3 3.3-1.4 4-1.6 4.4-1.6.1 0 .3 0 .4.2v.5c0 .1-.2 1.6-.9 5.6-.3 1.7-.9 2.3-1.4 2.3-1.1.1-2-.7-3-1.4-1.7-1.1-2.6-1.7-4.2-2.8-1.9-1.2-.7-1.9.4-3 .3-.3 5.2-4.8 5.3-5.2v-.2h-.3c-.2 0-2.9 1.8-8.1 5.4-.8.5-1.5.8-2.1.8-.7 0-2-.4-3-.7-1.2-.4-2.1-.6-2-1.3 0-.3.5-.7 1.5-1.1Z" />
+  </svg>`;
+
 let account = null;
 
-const renderAccount = ({ user, googleEnabled }) => {
+const renderAccount = ({ user, googleEnabled, telegramEnabled }) => {
   if (!accountSlot) return;
   const next = encodeURIComponent(accountSlot.dataset.next || "/");
 
-  // With Google sign-in switched off there is nothing to offer, so the slot
+  // With no sign-in method configured there is nothing to offer, so the slot
   // stays out of the header rather than showing a dead button.
-  if (!user && !googleEnabled) {
+  if (!user && !googleEnabled && !telegramEnabled) {
     accountSlot.hidden = true;
     return;
   }
 
   accountSlot.hidden = false;
-  accountSlot.innerHTML = user
-    ? `<span class="account-user">
+  if (user) {
+    accountSlot.innerHTML = `<span class="account-user">
         ${user.picture ? `<img src="${escapeHtml(user.picture)}" alt="" width="24" height="24" referrerpolicy="no-referrer" />` : ""}
-        <span class="account-name">${escapeHtml(user.name || user.email)}</span>
+        <span class="account-name">${escapeHtml(user.name || user.email || user.phone)}</span>
       </span>
-      <a class="account-logout" href="/api/auth/logout?next=${next}">Chiqish</a>`
-    : `<a class="account-signin" href="/api/auth/login?next=${next}">${GOOGLE_MARK}<span>Kirish</span></a>`;
+      <a class="account-logout" href="/api/auth/logout?next=${next}">Chiqish</a>`;
+    return;
+  }
+
+  accountSlot.innerHTML = [
+    googleEnabled ? `<a class="account-signin" href="/api/auth/login?next=${next}">${GOOGLE_MARK}<span>Kirish</span></a>` : "",
+    telegramEnabled
+      ? `<a class="account-signin" data-telegram-signin href="/api/auth/telegram/start?next=${next}">${TELEGRAM_MARK}<span>Telegram</span></a>`
+      : "",
+  ].join("");
 };
+
+/**
+ * The bot conversation happens in another tab, so this page asks the server
+ * whether the token it holds has been verified. The token is in an HttpOnly
+ * cookie, which is why the server reports `waiting` instead of the page
+ * looking for itself.
+ */
+const checkTelegramLogin = async () => {
+  try {
+    const response = await fetch("/api/auth/telegram/status", { headers: { Accept: "application/json" } });
+    if (!response.ok) return false;
+    const result = await response.json();
+    if (result.ready) {
+      window.location.href = result.next || "/";
+      return false;
+    }
+    return Boolean(result.waiting);
+  } catch {
+    return false;
+  }
+};
+
+let telegramPolling = false;
+
+const waitForTelegram = async () => {
+  if (telegramPolling) return;
+  telegramPolling = true;
+  if (checkoutStatus) checkoutStatus.textContent = "Telegram’da telefon raqamingizni ulashing — sahifa o‘zi yangilanadi.";
+
+  // Ten minutes, matching how long the login token stays valid.
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    if (!(await checkTelegramLogin())) break;
+  }
+  telegramPolling = false;
+};
+
+accountSlot?.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-telegram-signin]");
+  if (!trigger) return;
+  event.preventDefault();
+  // Opened in a new tab so this one stays alive to notice the result.
+  window.open(trigger.href, "_blank", "noopener");
+  waitForTelegram();
+});
 
 const renderAccountOrders = (orders) => {
   if (!accountOrders || !accountOrdersBody) return;
@@ -649,7 +708,11 @@ const loadAccount = async () => {
     account = result.user || null;
     renderAccount(result);
 
-    if (!account) return;
+    // Returning to this tab after talking to the bot: pick the flow back up.
+    if (!account) {
+      if (await checkTelegramLogin()) waitForTelegram();
+      return;
+    }
     // Google gives us a name but never a phone number, so only one field fills in.
     const nameInput = checkoutForm?.elements.namedItem("name");
     if (nameInput && !nameInput.value) nameInput.value = account.name || "";
