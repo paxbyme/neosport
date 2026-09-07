@@ -4,8 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs",
+    "images:optimize": "node optimize-images.mjs",
+    "build": "npm run images:optimize && node build.mjs",
     "dev": "node server.mjs",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "npm run build && node --test tests/smoke.test.mjs",
+    "db:migrate": "node migrate.mjs"
+  },
+  "devDependencies": {
+    "pg": "^8.23.0"
+  },
+  "dependencies": {
+    "sharp": "^0.35.4"
   }
 }

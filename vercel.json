@@ -4,5 +4,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "cleanUrls": false,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/shop", "destination": "/shop.html" }
+  ]
 }

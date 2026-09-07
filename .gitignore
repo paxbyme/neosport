@@ -1,3 +1,12 @@
 dist/
+node_modules/
 .vercel/
 .DS_Store
+assets/uploads/
+
+# Local order history holds customer names and phone numbers.
+data/orders.json
+
+# Every local env file stays out, but the template belongs in the repo.
+.env*
+!.env.example

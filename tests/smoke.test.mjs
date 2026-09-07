@@ -1,0 +1,1009 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import test from "node:test";
+import { requireAdmin } from "../admin-auth.mjs";
+import { createTelegramOrder } from "../order-service.mjs";
+import { createProduct, effectivePrice, MAX_DISCOUNT_PERCENT, MAX_IMAGES, updateProduct } from "../product-service.mjs";
+import { buildStats } from "../stats-service.mjs";
+import { createSessionCookie, isAdminEmail, readSession, safeNextPath, SESSION_COOKIE } from "../auth-session.mjs";
+import { callbackUrl, googleAuthorizeUrl, isAuthConfigured } from "../auth-service.mjs";
+import { resetRateLimits } from "../rate-limit.mjs";
+
+const fakeRequest = (headers = {}) => ({ headers, socket: { remoteAddress: "203.0.113.7" } });
+
+// Turns a Set-Cookie string back into the Cookie header a browser would send.
+const asCookieHeader = (setCookie) => setCookie.split(";")[0];
+
+const root = process.cwd();
+const read = (path) => readFileSync(join(root, path), "utf8");
+const html = read("index.html");
+const shopHtml = read("shop.html");
+const css = read("styles.css");
+const landingCss = read("landing.css");
+const shopCss = read("shop.css");
+const script = read("script.js");
+const instagram = "https://www.instagram.com/neosport_namangan/";
+const maps = "https://yandex.uz/maps/-/CTgRbPmH";
+
+test("page keeps the required sections and unique IDs", () => {
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+
+  assert.deepEqual(duplicates, []);
+  for (const id of ["main", "top", "hero-title", "new", "collection", "about", "store"]) {
+    assert.ok(ids.includes(id), `missing #${id}`);
+  }
+});
+
+test("hero prioritizes the separate shop and retains collection browsing", () => {
+  const heroActions = html.match(/<div class="hero-actions">[\s\S]*?<\/div>/)?.[0] ?? "";
+
+  assert.match(heroActions, /class="button button-primary" href="\/shop"/);
+  assert.match(heroActions, /class="button button-ghost" href="#collection"/);
+  assert.ok(heroActions.indexOf("button-primary") < heroActions.indexOf("button-ghost"));
+  assert.match(html, /class="mobile-actions"/);
+});
+
+test("the landing page ships no hardcoded products", () => {
+  assert.equal([...html.matchAll(/<a\s+class="card"[\s\S]*?<\/a>/g)].length, 0);
+  assert.doesNotMatch(html, /assets\/products\//);
+
+  // A placeholder holds the grid's place until the catalog is filled again.
+  assert.match(html, /class="row-empty"/);
+  assert.match(landingCss, /\.row-empty \{/);
+
+  // No Product structured data while the store lists nothing.
+  assert.doesNotMatch(html, /"@type": "Product"/);
+
+  // The sprite of models is gone from the landing page entirely.
+  assert.doesNotMatch(html + landingCss, /neosport-categories/);
+});
+
+test("the three category tiles link out and carry no product photography", () => {
+  const tiles = [...html.matchAll(/<a\s+class="tile"[\s\S]*?<\/a>/g)].map((match) => match[0]);
+  assert.equal(tiles.length, 3);
+
+  for (const tile of tiles) {
+    assert.match(tile, new RegExp(`href="${instagram}"`));
+    assert.match(tile, /aria-label="/);
+    assert.match(tile, /<h3>/);
+    // The cut-out product shots are gone, so the tiles are label-only.
+    assert.doesNotMatch(tile, /<img|<picture/);
+  }
+
+  assert.doesNotMatch(landingCss, /\.tile img/);
+
+  // Football kit is not stocked, so no lane claims it.
+  assert.doesNotMatch(html, /FUTBOL|Futbol kiyimlari/);
+});
+
+test("buttons are flat rectangles with no decorative arrow", () => {
+  // [^}]* keeps each assertion inside its own rule block.
+  assert.match(css, /\.button \{[^}]*justify-content: center;/);
+  assert.doesNotMatch(css, /\.button \{[^}]*border-radius/);
+  assert.doesNotMatch(css, /\.button:hover \{[^}]*translateY/);
+
+  for (const button of html.matchAll(/<a class="button[^"]*"[^>]*>([\s\S]*?)<\/a>/g)) {
+    assert.doesNotMatch(button[1], /[→↗↓]/, `decorative arrow in button: ${button[1].trim()}`);
+  }
+});
+
+test("numbering appears only on the ordered buying steps", () => {
+  const main = html.match(/<main id="main">[\s\S]*?<\/main>/)?.[0] ?? "";
+
+  assert.match(main, /<ol class="steps-track">/);
+  assert.equal((main.match(/<li>/g) ?? []).length >= 3, true);
+  assert.match(landingCss, /counter-increment: step/);
+  // The old design stamped 01 / 02 / 03 markers on non-sequential sections.
+  assert.doesNotMatch(main, /\b0[1-4]\s*\/\s*[A-Z]/);
+});
+
+test("shop uses the same retail layout system as the landing page", () => {
+  assert.match(shopHtml, /<link rel="stylesheet" href="shop\.css" \/>/);
+
+  // Compact page head instead of the old full-height hero.
+  assert.match(shopHtml, /class="shop-head"/);
+  assert.doesNotMatch(shopHtml, /shop-page-hero|shop-page-glow|shop-page-tags/);
+
+  // Product detail is rendered into the modal: image column beside a sticky buy panel.
+  assert.match(script, /<article class="pdp">/);
+  assert.match(script, /class="pdp-media"/);
+  assert.match(script, /class="pdp-panel"/);
+  assert.match(shopCss, /\.pdp-panel \{[^}]*position: sticky;/);
+
+  // Catalog tiles match the landing grid: flat, contained, no card chrome.
+  assert.match(shopCss, /\.catalog-card-image \{[^}]*background: var\(--tile\);/);
+  assert.match(shopCss, /\.catalog-card-image img \{[^}]*object-fit: contain;/);
+  assert.doesNotMatch(shopCss, /\.catalog-card[^{]*\{[^}]*border-radius/);
+
+  // No decorative arrows survive in the shop's own buttons or generated markup.
+  for (const button of shopHtml.matchAll(/<(?:a|button) class="(?:button|shop-add-button|checkout-button)[^"]*"[^>]*>([\s\S]*?)<\/(?:a|button)>/g)) {
+    assert.doesNotMatch(button[1], /[→↗↓↖+]/, `decorative glyph in shop button: ${button[1].trim()}`);
+  }
+  assert.doesNotMatch(script, /catalog-card-view[^<]*<b>/);
+
+  // The old landing/shop rules are gone from the shared stylesheet.
+  assert.doesNotMatch(css, /\.catalog-card|\.pdp-panel|\.cart-drawer|\.shop-product/);
+});
+
+test("shop is a standalone page linked from the landing page", () => {
+  assert.match(html, /href="\/shop"/);
+  assert.doesNotMatch(html, /id="shop"/);
+  assert.doesNotMatch(html, /id="cart-drawer"/);
+  assert.match(shopHtml, /<body class="shop-page">/);
+  assert.match(shopHtml, /id="shop-hero-title"/);
+  assert.match(shopHtml, /id="shop"/);
+});
+
+test("all conversion links use verified destinations and analytics attributes", () => {
+  const externalAnchors = [...html.matchAll(/<a\b[\s\S]*?<\/a>/g)]
+    .map((match) => match[0])
+    .filter((anchor) => anchor.includes(instagram) || anchor.includes(maps));
+
+  assert.ok(externalAnchors.length >= 10);
+
+  for (const anchor of externalAnchors) {
+    const href = anchor.match(/href="([^"]+)"/)?.[1];
+    const location = anchor.match(/data-analytics-location="([^"]+)"/)?.[1];
+    const destination = anchor.match(/data-analytics-destination="([^"]+)"/)?.[1];
+
+    assert.ok([instagram, maps].includes(href), `unverified external destination: ${href}`);
+    assert.ok(["hero", "product", "category", "mobile", "store", "footer"].includes(location), `invalid analytics location: ${location}`);
+    assert.equal(destination, href === instagram ? "instagram" : "maps");
+  }
+
+  assert.match(script, /name: "outbound_click"/);
+  assert.match(script, /typeof window\.va !== "function"/);
+  assert.match(html, /src="\/_vercel\/insights\/script\.js"/);
+});
+
+test("SEO metadata and structured data only use verified store details", () => {
+  assert.match(html, /<title>NeoSport Namangan — Erkaklar sport kiyimlari<\/title>/);
+  assert.match(html, /property="og:title"/);
+  assert.match(html, /property="og:image" content="\/assets\/neosport-hero\.png"/);
+  assert.doesNotMatch(html, /rel="canonical"/i);
+
+  const jsonText = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(jsonText, "missing JSON-LD");
+  const store = JSON.parse(jsonText);
+
+  assert.equal(store["@type"], "Store");
+  assert.equal(store.name, "NeoSport");
+  assert.equal(store.address.addressLocality, "Namangan");
+  assert.equal(store.geo.latitude, 41.0139);
+  assert.equal(store.geo.longitude, 71.6372);
+  assert.deepEqual(store.sameAs, [instagram]);
+  assert.equal(store.hasMap, maps);
+
+  for (const unsupportedField of ["telephone", "openingHours", "streetAddress", "priceRange"]) {
+    assert.equal(JSON.stringify(store).includes(unsupportedField), false, `unsupported ${unsupportedField} in structured data`);
+  }
+});
+
+test("displayed images have WebP sources, PNG fallbacks, and intrinsic dimensions", () => {
+  for (const basename of ["neosport-hero", "neosport-mark"]) {
+    assert.ok(existsSync(join(root, "assets", `${basename}.png`)));
+    assert.ok(existsSync(join(root, "assets", `${basename}.webp`)));
+  }
+
+  assert.match(landingCss, /neosport-hero\.webp/);
+  assert.match(landingCss, /neosport-hero\.png/);
+  assert.match(html, /rel="preload" as="image" href="assets\/neosport-hero\.webp"/);
+
+  // Product photography no longer lives in the repo; the admin panel supplies it.
+  assert.equal(existsSync(join(root, "assets", "products")), false);
+  assert.equal(existsSync(join(root, "product-source")), false);
+
+  const images = [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0]);
+  assert.ok(images.length > 0);
+  for (const image of images) {
+    assert.match(image, /\bwidth="\d+"/);
+    assert.match(image, /\bheight="\d+"/);
+  }
+
+  // The hero is the one heavy photo, and WebP has to earn its place against the PNG.
+  const heroPng = statSync(join(root, "assets", "neosport-hero.png")).size;
+  const heroWebp = statSync(join(root, "assets", "neosport-hero.webp")).size;
+  assert.ok(heroWebp <= heroPng * 0.4, "WebP transfer reduction is below 60%");
+});
+
+test("menu and motion code include accessibility fallbacks", () => {
+  assert.match(script, /event\.key !== "Escape"/);
+  assert.match(script, /setMenuState\(false, true\)/);
+  assert.match(script, /"IntersectionObserver" in window/);
+  assert.match(script, /prefers-reduced-motion: reduce/);
+  assert.match(css, /html:not\(\.js\) \.site-nav/);
+  assert.match(css, /:focus-visible/);
+
+  for (const sheet of [landingCss, shopCss]) {
+    assert.match(sheet, /@media \(prefers-reduced-motion: reduce\)/);
+  }
+
+  // Nothing animates in on scroll any more, so the reveal system is gone.
+  assert.doesNotMatch(html + shopHtml, /class="[^"]*\breveal\b/);
+  assert.doesNotMatch(css + landingCss + shopCss, /\.reveal/);
+  assert.doesNotMatch(script, /revealElements/);
+});
+
+test("runtime image fallbacks point at assets the build ships", () => {
+  const fallbacks = [...script.matchAll(/["'](assets\/[a-z0-9/-]+\.(?:webp|png|jpg))["']/g)].map((m) => m[1]);
+  assert.ok(fallbacks.length > 0);
+
+  for (const asset of new Set(fallbacks)) {
+    assert.ok(existsSync(join(root, "dist", asset)), `script.js references ${asset}, which the build does not ship`);
+  }
+});
+
+test("no product is hardcoded into the site, the client, or the service", () => {
+  assert.doesNotMatch(html, /id="new-model"/);
+  assert.doesNotMatch(html, /WOVEN UTILITY/i);
+  assert.doesNotMatch(css + landingCss, /\.featured-product|\.product-thumb\b/);
+
+  // The Skechers set was the last seeded product; it is gone from every layer.
+  assert.doesNotMatch(html + shopHtml + script, /skechers-woven-utility/);
+  assert.doesNotMatch(read("product-service.mjs"), /defaultProduct/);
+  assert.match(script, /^const catalogue = \{\};$/m);
+
+  assert.match(html, /href="\/shop"/);
+});
+
+test("online shop supports variants, a persistent cart, and customer checkout", () => {
+  for (const id of ["shop", "catalog-grid", "catalog-empty", "cart-drawer", "cart-items", "checkout-form"]) {
+    assert.match(shopHtml, new RegExp(`id="${id}"`));
+  }
+
+  // Colour and size pickers are generated per product from the API payload.
+  assert.match(script, /name="color"/);
+  assert.match(script, /name="size"/);
+  assert.match(shopHtml, /name="name"[\s\S]*?autocomplete="name"/);
+  assert.match(shopHtml, /name="phone"[\s\S]*?autocomplete="tel"/);
+  assert.match(script, /neosport-cart-v1/);
+  assert.match(script, /localStorage\.setItem/);
+  assert.match(script, /fetch\("\/api\/order"/);
+  assert.match(script, /name: "add_to_cart"/);
+  assert.match(script, /name: "order_submitted"/);
+  assert.match(shopHtml, /<footer class="site-footer">/);
+  assert.match(css, /\.site-footer\s*\{/);
+  assert.doesNotMatch(css, /(^|\n)footer\s*\{/);
+});
+
+test("mobile navigation stays out of layout when closed and map marker has no logo", () => {
+  assert.match(css, /\.js \.site-nav:not\(\.is-open\)\s*\{\s*display: none;/);
+  assert.match(shopCss, /@media \(max-width: 420px\)[\s\S]*?\.cart-item/);
+  const mapPin = html.match(/<div class="map-pin">[\s\S]*?<\/div>/)?.[0] ?? "";
+  assert.doesNotMatch(mapPin, /<img|neosport-mark/);
+  // The marker is drawn in CSS rather than reusing the brand logo.
+  assert.match(landingCss, /\.place-map \.map-pin \{[\s\S]*?background: var\(--lime\)/);
+});
+
+test("admin panel and server-side product management are wired", () => {
+  const adminHtml = read("admin.html");
+  const adminScript = read("admin.js");
+
+  assert.match(adminHtml, /id="login-form"/);
+  assert.match(adminHtml, /id="product-admin-form"/);
+  assert.match(adminHtml, /name="image-file"/);
+  // Size checkboxes are rendered from the category, so they live in the script.
+  assert.match(adminHtml, /id="size-checks"/);
+  assert.match(adminScript, /name="sizes"/);
+  assert.match(adminHtml, /name="color-label"/);
+  assert.match(adminScript, /\/api\/admin\/products/);
+  assert.match(script, /fetch\("\/api\/products"/);
+
+  resetRateLimits();
+  assert.throws(
+    () => requireAdmin(fakeRequest({ authorization: "Bearer wrong" }), { ADMIN_PASSWORD: "correct-password" }),
+    /Parol noto‘g‘ri/,
+  );
+  assert.doesNotThrow(() =>
+    requireAdmin(fakeRequest({ authorization: "Bearer correct-password" }), { ADMIN_PASSWORD: "correct-password" }),
+  );
+});
+
+test("the catalog starts empty and is filled from the admin panel", () => {
+  assert.deepEqual(JSON.parse(read("data/products.json")), []);
+
+  // The shop renders whatever /api/products returns, and says so when that is nothing.
+  assert.match(shopHtml, /id="catalog-empty"/);
+  assert.match(shopCss, /\.catalog-empty \{/);
+  assert.match(script, /const renderCatalog = /);
+  assert.match(script, /if \(catalogEmpty\) catalogEmpty\.hidden = products\.length > 0;/);
+
+  // The admin list has an empty state of its own.
+  assert.match(read("admin.js"), /admin-empty/);
+});
+
+test("Telegram order service recalculates trusted totals and formats customer details", async () => {
+  // The local catalog is empty by design, so the order runs against a stubbed database.
+  const environment = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-service-key",
+    TELEGRAM_BOT_TOKEN: "test-token",
+    TELEGRAM_CHAT_ID: "test-chat",
+  };
+  const rows = [
+    {
+      id: "test-track-set",
+      name: "Test Track komplekti",
+      brand: "Skechers",
+      category: "Komplekt",
+      price: 589000,
+      description: "Test uchun komplekt.",
+      sizes: ["L", "XL"],
+      colors: [{ id: "teal", label: "To‘q yashil", hex: "#163c3e" }],
+      image_url: "https://example.supabase.co/track-set.webp",
+      active: true,
+      created_at: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "test-legend-tee",
+      name: "Test Legend futbolkasi",
+      brand: "Nike",
+      category: "Futbolka",
+      price: 349000,
+      description: "Test uchun futbolka.",
+      sizes: ["L"],
+      colors: [{ id: "black", label: "Qora", hex: "#111111" }],
+      image_url: "https://example.supabase.co/legend-tee.webp",
+      active: true,
+      created_at: "2026-01-02T00:00:00.000Z",
+    },
+  ];
+
+  const originalFetch = globalThis.fetch;
+  let telegramRequest;
+  let storedOrder;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes("/rest/v1/products")) {
+      return new Response(JSON.stringify(rows), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (String(url).includes("/rest/v1/orders")) {
+      storedOrder = JSON.parse(options.body);
+      return new Response(null, { status: 204 });
+    }
+    telegramRequest = { url: String(url), body: JSON.parse(options.body) };
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  try {
+    const result = await createTelegramOrder(
+      {
+        name: "Azizbek Karimov",
+        phone: "+998 90 123 45 67",
+        items: [
+          { productId: "test-track-set", color: "teal", size: "XL", quantity: 2 },
+          { productId: "test-legend-tee", color: "black", size: "L", quantity: 1 },
+        ],
+      },
+      environment,
+    );
+
+    assert.match(result.orderId, /^NS-/);
+    assert.match(telegramRequest.url, /api\.telegram\.org\/bottest-token\/sendMessage/);
+    assert.equal(telegramRequest.body.chat_id, "test-chat");
+    assert.match(telegramRequest.body.text, /Azizbek Karimov/);
+    assert.match(telegramRequest.body.text, /To‘q yashil/);
+    assert.match(telegramRequest.body.text, /Test Legend futbolkasi/);
+    assert.match(telegramRequest.body.text, /1[\s\u00a0]?527[\s\u00a0]?000 so‘m/);
+
+    // The order is kept so the statistics have something to count.
+    assert.equal(storedOrder.id, result.orderId);
+    assert.equal(storedOrder.total, 1527000);
+    assert.equal(storedOrder.customer_phone, "+998 90 123 45 67");
+    assert.equal(storedOrder.items.length, 2);
+    assert.equal(storedOrder.items[0].quantity, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("an empty catalog rejects orders instead of trusting the client", async () => {
+  await assert.rejects(
+    () =>
+      createTelegramOrder(
+        {
+          name: "Azizbek Karimov",
+          phone: "+998 90 123 45 67",
+          items: [{ productId: "test-track-set", color: "teal", size: "XL", quantity: 1 }],
+        },
+        { TELEGRAM_BOT_TOKEN: "test-token", TELEGRAM_CHAT_ID: "test-chat" },
+      ),
+    /noto‘g‘ri mahsulot/,
+  );
+});
+
+test("production output is complete and excludes unused media", () => {
+  for (const file of [
+    "index.html",
+    "shop.html",
+    "styles.css",
+    "landing.css",
+    "shop.css",
+    "script.js",
+    "admin.html",
+    "admin.css",
+    "admin.js",
+  ]) {
+    assert.ok(existsSync(join(root, "dist", file)), `missing dist/${file}`);
+  }
+
+  const productionAssets = readdirSync(join(root, "dist", "assets"))
+    .filter((name) => statSync(join(root, "dist", "assets", name)).isFile())
+    .sort();
+  assert.deepEqual(productionAssets, [
+    "neosport-hero.png",
+    "neosport-hero.webp",
+    "neosport-mark.png",
+    "neosport-mark.webp",
+  ]);
+});
+
+/* ------------------------------------------- admin: editing and discounts -- */
+
+const supabaseEnvironment = {
+  SUPABASE_URL: "https://example.supabase.co",
+  SUPABASE_SERVICE_ROLE_KEY: "test-service-key",
+};
+
+const productRow = (overrides = {}) => ({
+  id: "test-track-set",
+  name: "Test Track komplekti",
+  brand: "Skechers",
+  category: "Komplekt",
+  price: 589000,
+  discount_percent: 0,
+  description: "Test uchun komplekt.",
+  sizes: ["L", "XL"],
+  colors: [{ id: "color-1", label: "Qora", hex: "#111111" }],
+  image_url: "https://example.supabase.co/track-set.webp",
+  active: true,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: null,
+  ...overrides,
+});
+
+const withStubbedFetch = async (handler, run) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = handler;
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+};
+
+test("a discounted price is rounded to whole thousands and never falls below the floor", () => {
+  assert.equal(effectivePrice(589000, 0), 589000, "no discount leaves the price untouched");
+  assert.equal(effectivePrice(349000, 20), 279000);
+  assert.equal(effectivePrice(650000, 35), 423000, "422 500 rounds to a price a shop would print");
+  assert.equal(effectivePrice(1000, MAX_DISCOUNT_PERCENT), 1000, "the 1000 so‘m floor holds");
+
+  // The storefront and the admin panel repeat this formula; they must agree.
+  assert.match(read("script.js"), /finalPrice/);
+  assert.match(read("admin.js"), /const effectivePrice = /);
+});
+
+test("an edit without a new photo keeps the stored image and rejects a bad discount", async () => {
+  let patchBody;
+  await withStubbedFetch(
+    async (url, options) => {
+      patchBody = JSON.parse(options.body);
+      return new Response(JSON.stringify([productRow({ price: 650000, discount_percent: 35, updated_at: "2026-09-07T00:00:00.000Z" })]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    async () => {
+      const product = await updateProduct(
+        "test-track-set",
+        {
+          name: "Test Track komplekti PRO",
+          brand: "Skechers",
+          category: "Komplekt",
+          price: 650000,
+          discountPercent: 35,
+          description: "Tahrirlangan tavsif.",
+          sizes: ["L", "XL", "2XL"],
+          colors: [{ label: "Qora", hex: "#111111" }],
+          image: "",
+        },
+        supabaseEnvironment,
+      );
+
+      assert.equal(product.finalPrice, 423000);
+      assert.equal(product.discountPercent, 35);
+    },
+  );
+
+  // No image was supplied, so image_url must not be part of the patch.
+  assert.equal("image_url" in patchBody, false);
+  assert.equal(patchBody.discount_percent, 35);
+  assert.equal(patchBody.price, 650000);
+
+  await assert.rejects(
+    () => updateProduct("test-track-set", { name: "X", price: 100 }, supabaseEnvironment),
+    /Narxni so‘mda/,
+  );
+  await assert.rejects(
+    () =>
+      updateProduct(
+        "test-track-set",
+        {
+          name: "Test Track komplekti",
+          brand: "Skechers",
+          category: "Komplekt",
+          price: 650000,
+          discountPercent: 95,
+          description: "Tahrirlangan tavsif.",
+          sizes: ["L"],
+          colors: [{ label: "Qora", hex: "#111111" }],
+        },
+        supabaseEnvironment,
+      ),
+    /Chegirma 0 dan 90 foizgacha/,
+  );
+});
+
+test("statistics aggregate the catalog and the stored orders", async () => {
+  const orders = [
+    {
+      id: "NS-1",
+      created_at: new Date().toISOString(),
+      customer_name: "Azizbek Karimov",
+      customer_phone: "+998 90 123 45 67",
+      items: [{ productId: "test-legend-tee", name: "Test Legend futbolkasi", brand: "Nike", quantity: 2, unitPrice: 279000, subtotal: 558000 }],
+      total: 558000,
+    },
+    {
+      id: "NS-2",
+      created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+      customer_name: "Bekzod Aliyev",
+      customer_phone: "+998 91 000 00 00",
+      items: [{ productId: "test-track-set", name: "Test Track komplekti", brand: "Skechers", quantity: 1, unitPrice: 589000, subtotal: 589000 }],
+      total: 589000,
+    },
+  ];
+
+  const stats = await withStubbedFetch(
+    async (url) => {
+      const body = String(url).includes("/rest/v1/orders")
+        ? orders
+        : [productRow(), productRow({ id: "test-legend-tee", brand: "Nike", category: "Futbolka", price: 349000, discount_percent: 20, active: false })];
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    },
+    () => buildStats(supabaseEnvironment),
+  );
+
+  assert.equal(stats.catalog.total, 2);
+  assert.equal(stats.catalog.active, 1);
+  assert.equal(stats.catalog.inactive, 1);
+  // The inactive product is discounted, so it is not part of the sellable value.
+  assert.equal(stats.catalog.catalogValue, 589000);
+  assert.deepEqual(stats.catalog.brands.map((brand) => brand.name).sort(), ["Nike", "Skechers"]);
+
+  assert.equal(stats.orders.today.count, 1);
+  assert.equal(stats.orders.today.revenue, 558000);
+  assert.equal(stats.orders.last7Days.count, 1);
+  assert.equal(stats.orders.last30Days.count, 2);
+  assert.equal(stats.orders.allTime.revenue, 1147000);
+  assert.equal(stats.orders.allTime.items, 3);
+  assert.equal(stats.orders.topProducts[0].name, "Test Legend futbolkasi");
+  assert.equal(stats.orders.recent[0].id, "NS-1");
+});
+
+test("statistics survive a missing order history", async () => {
+  const stats = await withStubbedFetch(
+    async (url) => {
+      if (String(url).includes("/rest/v1/orders")) return new Response("relation does not exist", { status: 404 });
+      return new Response(JSON.stringify([productRow()]), { status: 200, headers: { "Content-Type": "application/json" } });
+    },
+    () => buildStats(supabaseEnvironment),
+  );
+
+  assert.equal(stats.orders, null, "a store without an orders table still reports on its catalog");
+  assert.equal(stats.catalog.total, 1);
+});
+
+test("the admin panel exposes adding, editing, discounts, and statistics", () => {
+  const adminHtml = read("admin.html");
+  const adminScript = read("admin.js");
+  const adminCss = read("admin.css");
+
+  // Add and edit share one form; the heading and button switch mode.
+  assert.match(adminHtml, /id="product-form-title"/);
+  assert.match(adminHtml, /id="cancel-edit-button"/);
+  assert.match(adminScript, /const startEdit = /);
+  assert.match(adminScript, /const exitEditMode = /);
+  assert.match(adminScript, /method: "PATCH"/);
+
+  // Discounts: an input, a live preview of the resulting price, a list badge.
+  assert.match(adminHtml, /name="discountPercent"/);
+  assert.match(adminHtml, /id="price-preview"/);
+  assert.match(adminScript, /const updatePricePreview = /);
+  assert.match(adminCss, /\.price-preview \{/);
+
+  // Visibility toggle instead of deleting seasonal stock.
+  assert.match(adminScript, /data-toggle-product/);
+  assert.match(adminScript, /JSON\.stringify\(\{ active: !product\.active \}\)/);
+
+  // Statistics block with its own endpoint.
+  assert.match(adminHtml, /id="stats-body"/);
+  assert.match(adminHtml, /id="stats-refresh"/);
+  assert.match(adminScript, /\/api\/admin\/stats/);
+  assert.match(adminCss, /\.stat-tile \{/);
+  assert.match(read("api/admin/stats.mjs"), /requireAdmin/);
+});
+
+test("the storefront prints the discounted price and charges it", () => {
+  // Sale price first, the price it replaces struck through, then the badge.
+  assert.match(script, /is-discounted/);
+  assert.match(script, /<s>\$\{formatPlain\(product\.price\)\}<\/s>/);
+  assert.match(shopCss, /\.catalog-card-price s \{/);
+  assert.match(shopCss, /\.pdp-price b \{/);
+
+  // The cart total follows the discounted price, not the list price.
+  assert.match(script, /price: product\.finalPrice/);
+  assert.match(read("order-service.mjs"), /const unitPrice = product\.finalPrice \?\? product\.price;/);
+});
+
+test("the orders table is defined and kept out of the repository", () => {
+  const schema = read("supabase-schema.sql");
+  assert.match(schema, /create table if not exists public\.orders/);
+  assert.match(schema, /alter table public\.orders enable row level security/);
+  assert.match(schema, /discount_percent smallint not null default 0/);
+
+  // Local order history holds customer names and phone numbers.
+  assert.match(read(".gitignore"), /data\/orders\.json/);
+});
+
+test("image rules set both dimensions so the HTML size attributes cannot stretch them", () => {
+  // Every <img> carries width/height attributes as presentational hints. A CSS
+  // rule that overrides only width leaves the attribute height in force, which
+  // is what stretched the admin login logo to 54x540.
+  for (const [name, sheet] of [
+    ["admin.css", read("admin.css")],
+    ["styles.css", css],
+    ["landing.css", landingCss],
+    ["shop.css", shopCss],
+  ]) {
+    // Comments are stripped first: one of them mentions "img" and would
+    // otherwise be read as part of the following selector.
+    for (const rule of sheet.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]*\bimg\b[^{}]*)\{([^}]*)\}/g)) {
+      const [, selector, body] = rule;
+      if (!/(^|[;\s])width\s*:/.test(body)) continue;
+      assert.match(body, /(^|[;\s])height\s*:/, `${name}: "${selector.trim()}" sets width without height`);
+    }
+  }
+
+  assert.match(read("admin.css"), /\.login-card img \{[^}]*height: auto;/);
+});
+
+/* ------------------------------------------------- Google sign-in sessions -- */
+
+const sessionEnvironment = {
+  SESSION_SECRET: "a-test-secret-that-is-long-enough-to-pass",
+  ADMIN_EMAILS: "paxbyme@gmail.com",
+};
+
+const googleUser = { id: "google-sub-123", email: "paxbyme@gmail.com", name: "Pax", picture: "https://example.com/a.png" };
+
+test("a session cookie round-trips and carries no role of its own", () => {
+  const cookie = createSessionCookie(googleUser, { environment: sessionEnvironment });
+
+  assert.match(cookie, /^ns_session=/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /SameSite=Lax/);
+  assert.match(cookie, /Path=\//);
+  // Secure would stop the cookie working over plain http in development.
+  assert.doesNotMatch(cookie, /Secure/);
+
+  const session = readSession(fakeRequest({ cookie: asCookieHeader(cookie) }), sessionEnvironment);
+  assert.equal(session.id, "google-sub-123");
+  assert.equal(session.email, "paxbyme@gmail.com");
+  assert.equal(session.role, "admin");
+
+  // The very same cookie is only a customer once the address is not listed.
+  const demoted = readSession(fakeRequest({ cookie: asCookieHeader(cookie) }), {
+    ...sessionEnvironment,
+    ADMIN_EMAILS: "someone-else@gmail.com",
+  });
+  assert.equal(demoted.role, "customer", "admin rights must be revocable without waiting for the session to expire");
+});
+
+test("a tampered or unsigned session is rejected", () => {
+  const cookie = asCookieHeader(createSessionCookie(googleUser, { environment: sessionEnvironment }));
+  const [, token] = cookie.split("=");
+  const [payload, signature] = decodeURIComponent(token).split(".");
+
+  // Same payload, signed with a different secret.
+  const forged = createSessionCookie(googleUser, {
+    environment: { ...sessionEnvironment, SESSION_SECRET: "a-different-secret-that-is-also-long-enough" },
+  });
+  assert.equal(readSession(fakeRequest({ cookie: asCookieHeader(forged) }), sessionEnvironment), null);
+
+  // Payload edited, old signature kept.
+  const edited = Buffer.from(JSON.stringify({ sub: "x", email: "attacker@example.com", exp: 9999999999 })).toString("base64url");
+  assert.equal(readSession(fakeRequest({ cookie: `${SESSION_COOKIE}=${edited}.${signature}` }), sessionEnvironment), null);
+
+  assert.equal(readSession(fakeRequest({ cookie: `${SESSION_COOKIE}=${payload}` }), sessionEnvironment), null);
+  assert.equal(readSession(fakeRequest({}), sessionEnvironment), null);
+
+  // A secret too short to be safe must not produce a usable session.
+  assert.throws(() => createSessionCookie(googleUser, { environment: { SESSION_SECRET: "short" } }), /Sessiya kaliti/);
+});
+
+test("an expired session is not accepted", () => {
+  const expired = createSessionCookie(googleUser, { environment: sessionEnvironment });
+  const token = decodeURIComponent(asCookieHeader(expired).split("=")[1]);
+  const [payload] = token.split(".");
+  const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+
+  assert.ok(claims.exp > claims.iat, "the session has to carry an expiry");
+  assert.ok(claims.exp - claims.iat <= 30 * 24 * 60 * 60, "sessions must not outlive 30 days");
+});
+
+test("admin access follows ADMIN_EMAILS, not the cookie or a password", () => {
+  resetRateLimits();
+  const adminCookie = asCookieHeader(createSessionCookie(googleUser, { environment: sessionEnvironment }));
+
+  const session = requireAdmin(fakeRequest({ cookie: adminCookie }), sessionEnvironment);
+  assert.equal(session.role, "admin");
+
+  // A signed-in customer gets 403, and is never offered the password path.
+  const customerCookie = asCookieHeader(
+    createSessionCookie({ ...googleUser, email: "mijoz@gmail.com" }, { environment: sessionEnvironment }),
+  );
+  assert.throws(
+    () => requireAdmin(fakeRequest({ cookie: customerCookie }), { ...sessionEnvironment, ADMIN_PASSWORD: "correct" }),
+    (error) => error.status === 403 && /admin huquqi yo‘q/.test(error.message),
+  );
+
+  // With no session and no password configured, there is simply no way in.
+  assert.throws(
+    () => requireAdmin(fakeRequest({}), { SESSION_SECRET: sessionEnvironment.SESSION_SECRET }),
+    /Google orqali kiring/,
+  );
+
+  assert.equal(isAdminEmail("PaxByMe@Gmail.com", sessionEnvironment), true, "the allowlist is case-insensitive");
+  assert.equal(isAdminEmail("", sessionEnvironment), false);
+});
+
+test("password attempts are rate limited", () => {
+  resetRateLimits();
+  const environment = { ADMIN_PASSWORD: "correct-password" };
+  const attempt = () => requireAdmin(fakeRequest({ authorization: "Bearer wrong" }), environment);
+
+  for (let index = 0; index < 10; index += 1) {
+    assert.throws(attempt, /Parol noto‘g‘ri/, `attempt ${index + 1} should still be checked`);
+  }
+
+  // The eleventh attempt inside the window is refused before the comparison.
+  assert.throws(attempt, (error) => error.status === 429 && /Juda ko‘p urinish/.test(error.message));
+  resetRateLimits();
+});
+
+test("the post-login redirect cannot leave the site", () => {
+  assert.equal(safeNextPath("/shop"), "/shop");
+  assert.equal(safeNextPath("/admin?tab=1"), "/admin?tab=1");
+
+  for (const hostile of ["//evil.example.com", "https://evil.example.com", "javascript:alert(1)", "", null, "shop"]) {
+    assert.equal(safeNextPath(hostile), "/", `${hostile} must not be used as a redirect target`);
+  }
+});
+
+test("the Google callback URL is absolute and honours the deployment host", () => {
+  assert.equal(
+    callbackUrl(fakeRequest({ host: "localhost:4173" }), {}),
+    "http://localhost:4173/api/auth/callback",
+  );
+  assert.equal(
+    callbackUrl(fakeRequest({ host: "neosport-nu.vercel.app" }), { VERCEL: "1" }),
+    "https://neosport-nu.vercel.app/api/auth/callback",
+  );
+  assert.equal(
+    callbackUrl(fakeRequest({ host: "ignored" }), { SITE_URL: "https://neosport.uz/" }),
+    "https://neosport.uz/api/auth/callback",
+  );
+
+  // Without Supabase credentials the sign-in button must not be offered.
+  assert.equal(isAuthConfigured({}), false);
+  assert.equal(
+    isAuthConfigured({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon" }),
+    true,
+  );
+});
+
+test("sign-in is offered on every page and orders stay optional", () => {
+  for (const page of [html, shopHtml]) {
+    assert.match(page, /<div class="account" id="account"/);
+  }
+  assert.match(read("admin.html"), /id="google-signin"/);
+  assert.match(read("admin.html"), /\/api\/auth\/login\?next=\/admin/);
+
+  // Guest checkout survives: the order endpoint reads a session but never demands one.
+  const orderApi = read("api/order.mjs");
+  assert.match(orderApi, /readSession\(request\)/);
+  assert.doesNotMatch(orderApi, /401/);
+
+  // A customer only ever sees their own orders.
+  assert.match(read("api/orders.mjs"), /userId: session\.id/);
+  assert.match(script, /\/api\/auth\/me/);
+  assert.match(shopHtml, /id="account-orders"/);
+});
+
+test("the authorize URL leaves the OAuth state to Supabase", () => {
+  // Passing our own `state` made Supabase reject the callback with
+  // bad_oauth_state: it generates and validates its own for the PKCE flow.
+  const url = new URL(
+    googleAuthorizeUrl({
+      verifier: "test-verifier",
+      request: fakeRequest({ host: "localhost:4173" }),
+      environment: { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon" },
+    }),
+  );
+
+  assert.equal(url.searchParams.get("state"), null, "Supabase owns the OAuth state");
+  assert.equal(url.searchParams.get("provider"), "google");
+  assert.equal(url.searchParams.get("code_challenge_method"), "s256");
+  assert.ok(url.searchParams.get("code_challenge"), "PKCE challenge must still be sent");
+  assert.equal(url.searchParams.get("redirect_to"), "http://localhost:4173/api/auth/callback");
+
+  // The callback must not compare a state it never sent.
+  assert.doesNotMatch(read("api/auth/callback.mjs"), /searchParams\.get\("state"\)/);
+});
+
+test("an uploaded photo is re-encoded to WebP and capped in width", async () => {
+  const sharp = (await import("sharp")).default;
+  // A deliberately oversized PNG, the way a phone camera would arrive.
+  const original = await sharp({
+    create: { width: 3000, height: 3750, channels: 3, background: { r: 168, g: 249, b: 0 } },
+  })
+    .png()
+    .toBuffer();
+
+  let upload;
+  await withStubbedFetch(
+    async (url, options) => {
+      if (String(url).includes("/storage/v1/object/")) {
+        upload = { url: String(url), contentType: options.headers["Content-Type"], body: options.body };
+        return new Response(JSON.stringify({}), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify([productRow()]), { status: 200, headers: { "Content-Type": "application/json" } });
+    },
+    () =>
+      createProduct(
+        {
+          name: "Rasm sinovi",
+          brand: "NeoSport",
+          category: "Komplekt",
+          price: 300000,
+          description: "Rasm optimizatsiyasini sinash.",
+          sizes: ["L"],
+          colors: [{ label: "Qora", hex: "#111111" }],
+          image: `data:image/png;base64,${original.toString("base64")}`,
+        },
+        supabaseEnvironment,
+      ),
+  );
+
+  assert.match(upload.url, /\.webp$/, "the stored file is WebP whatever was uploaded");
+  assert.equal(upload.contentType, "image/webp");
+
+  const stored = await sharp(upload.body).metadata();
+  assert.equal(stored.format, "webp");
+  assert.equal(stored.width, 1280, "wide images are capped");
+  assert.ok(
+    upload.body.length < original.length,
+    `re-encoding must shrink the file (${upload.body.length} vs ${original.length})`,
+  );
+});
+
+test("sharp ships as a runtime dependency, not a build-only one", () => {
+  // The product API re-encodes uploads at request time, so sharp has to be
+  // installed in the deployed function, not just during the build.
+  const manifest = JSON.parse(read("package.json"));
+  assert.ok(manifest.dependencies?.sharp, "sharp belongs in dependencies");
+  assert.equal(manifest.devDependencies?.sharp, undefined);
+});
+
+test("a product carries up to ten photos, the first being the main one", async () => {
+  const sharp = (await import("sharp")).default;
+  const photo = async (shade) =>
+    `data:image/png;base64,${(
+      await sharp({ create: { width: 400, height: 500, channels: 3, background: { r: shade, g: 200, b: 40 } } })
+        .png()
+        .toBuffer()
+    ).toString("base64")}`;
+  const ten = await Promise.all([...Array(MAX_IMAGES)].map((_, index) => photo(index * 20)));
+
+  const uploads = [];
+  const product = await withStubbedFetch(
+    async (url) => {
+      if (String(url).includes("/storage/v1/object/")) {
+        uploads.push(String(url));
+        return new Response(JSON.stringify({}), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      // PostgREST echoes the row it was given; mirror the gallery back.
+      return new Response(JSON.stringify([productRow({ images: uploads.map((u) => u.replace("/object/", "/object/public/")) })]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    () =>
+      createProduct(
+        {
+          name: "Galereya sinovi",
+          brand: "NeoSport",
+          category: "Komplekt",
+          price: 500000,
+          description: "Galereyani sinash uchun mahsulot.",
+          sizes: ["L"],
+          colors: [{ label: "Qora", hex: "#111111" }],
+          images: ten,
+        },
+        supabaseEnvironment,
+      ),
+  );
+
+  assert.equal(uploads.length, MAX_IMAGES, "every photo is uploaded separately");
+  assert.equal(new Set(uploads).size, MAX_IMAGES, "each photo gets its own filename");
+  assert.equal(product.images.length, MAX_IMAGES);
+  assert.equal(product.imageUrl, product.images[0], "imageUrl mirrors the first photo");
+
+  await assert.rejects(
+    () =>
+      createProduct(
+        {
+          name: "Ko‘p rasm",
+          brand: "NeoSport",
+          category: "Komplekt",
+          price: 500000,
+          description: "Chegaradan oshirish urinishi.",
+          sizes: ["L"],
+          colors: [{ label: "Qora", hex: "#111111" }],
+          images: [...ten, ten[0]],
+        },
+        supabaseEnvironment,
+      ),
+    /Ko‘pi bilan 10 ta rasm/,
+  );
+});
+
+test("the shop renders a gallery and the admin panel manages one", () => {
+  // Thumbnails only appear when there is more than one photo.
+  assert.match(script, /product\.images\.length > 1/);
+  assert.match(script, /data-thumb=/);
+  assert.match(shopCss, /\.pdp-thumb \{/);
+
+  assert.match(read("admin.html"), /name="image-file"[^>]*multiple/);
+  assert.match(read("admin.html"), /id="image-gallery"/);
+  assert.match(read("admin.js"), /const renderImageGallery = /);
+  assert.match(read("admin.js"), /data-make-main/);
+  assert.match(read("admin.css"), /\.image-tile \{/);
+
+  // A single photo saved before the gallery existed still has to render.
+  assert.match(read("supabase-schema.sql"), /jsonb_build_array\(image_url\)/);
+});
+
+test("footwear is sized in EU numbers and clothing in letters", () => {
+  const adminScript = read("admin.js");
+  const adminHtml = read("admin.html");
+
+  // Both sets exist and the shoe categories that select them are listed.
+  assert.match(adminScript, /shoes: \["36", "37", "38", "39", "40", "41", "42", "43", "44", "45"\]/);
+  assert.match(adminScript, /clothing: \["S", "M", "L", "XL", "2XL", "3XL", "4XL"\]/);
+  for (const category of ["Krossovka", "Botinka", "Shippak"]) {
+    assert.match(adminScript, new RegExp(`SHOE_CATEGORIES[\\s\\S]*?"${category}"`), `${category} must pick shoe sizes`);
+    assert.match(adminHtml, new RegExp(`<option>${category}</option>`), `${category} must be offered`);
+  }
+
+  // Changing category re-renders the list rather than leaving stale boxes.
+  assert.match(adminScript, /const renderSizeChecks = /);
+  assert.match(adminScript, /namedItem\("category"\)\.addEventListener\("change"/);
+
+  // The server accepts numeric sizes as readily as letter ones.
+  const service = read("product-service.mjs");
+  assert.match(service, /\/\^\[A-Z0-9\]\{1,4\}\$\//);
+  assert.match(read("script.js"), /\/\^\[A-Z0-9\]\{1,4\}\$\//);
+});

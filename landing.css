@@ -1,0 +1,533 @@
+/* NeoSport landing layout.
+   Structured after luxury-retail e-commerce: a full-bleed hero, then a product
+   grid as the primary content, quiet centred section headings, hairline rules
+   instead of cards, and small tracked type throughout. The palette is unchanged
+   — near-black ground, single acid-lime accent.
+   Loaded after styles.css, which owns the tokens, header, footer and buttons. */
+
+.landing {
+  --pad: clamp(16px, 3vw, 40px);
+  --tile: #101310;
+}
+
+/* --------------------------------------------------------------- hero ---- */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(440px, 74vh, 720px);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background: #050705;
+}
+
+.hero-photo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-color: #050705;
+  background-image: url("assets/neosport-hero.png");
+  background-image: image-set(
+    url("assets/neosport-hero.webp") type("image/webp"),
+    url("assets/neosport-hero.png") type("image/png")
+  );
+  background-size: cover;
+  background-position: 68% center;
+}
+
+.hero-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(5, 7, 5, 0.1) 30%, rgba(5, 7, 5, 0.86) 100%);
+}
+
+.hero-copy {
+  width: 100%;
+  max-width: 620px;
+  padding: 0 var(--pad) clamp(40px, 6vh, 72px);
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(40px, 5.2vw, 76px);
+  font-weight: 900;
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+}
+
+.hero p {
+  max-width: 46ch;
+  margin: 16px 0 0;
+  color: #d3d7cd;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.hero-actions {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-actions .button {
+  min-width: 208px;
+}
+
+/* ------------------------------------------------------------ sections ---- */
+
+.row {
+  padding: clamp(52px, 6vw, 88px) var(--pad);
+}
+
+.row + .row {
+  padding-top: 0;
+}
+
+/* Quiet, centred, small — the heading announces the shelf, it is not the show. */
+.row-head {
+  margin: 0 0 clamp(24px, 3vw, 38px);
+  text-align: center;
+}
+
+.row-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.row-head p {
+  max-width: 58ch;
+  margin: 12px auto 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* Stands in for the product grid while the catalog is empty. */
+.row-empty {
+  padding: clamp(28px, 4vw, 56px) 0;
+  text-align: center;
+  border: 1px solid var(--line);
+  background: var(--tile);
+}
+
+.row-empty p {
+  max-width: 46ch;
+  margin: 0 auto clamp(16px, 2vw, 24px);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.row-more {
+  margin-top: clamp(28px, 3vw, 42px);
+  display: flex;
+  justify-content: center;
+}
+
+.row-more .button {
+  min-width: 268px;
+}
+
+/* --------------------------------------------------------- product grid ---- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.6vw, 24px) clamp(10px, 1.2vw, 18px);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-media {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 2vw, 34px);
+  overflow: hidden;
+  background: var(--tile);
+}
+
+.card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.card:hover .card-media img,
+.card:focus-visible .card-media img {
+  transform: scale(1.04);
+}
+
+.card-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 5px 8px;
+  color: var(--ink);
+  background: var(--lime);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.card-body {
+  padding: 14px 2px 0;
+}
+
+.card-body h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.card-body p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.card-ask {
+  margin-top: 9px;
+  display: inline-block;
+  color: var(--lime);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid transparent;
+  transition: border-color 180ms ease;
+}
+
+.card:hover .card-ask,
+.card:focus-visible .card-ask {
+  border-bottom-color: var(--lime);
+}
+
+/* ---------------------------------------------------------- categories ---- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.2vw, 18px);
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: clamp(180px, 20vw, 260px);
+  padding: clamp(20px, 2.4vw, 32px);
+  overflow: hidden;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.tile:hover,
+.tile:focus-visible {
+  border-color: var(--lime);
+  background: #141812;
+}
+
+.tile h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(26px, 2.8vw, 40px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+}
+
+.tile p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------ editorial ---- */
+
+.creed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 72px);
+  padding: clamp(52px, 6vw, 88px) var(--pad);
+  border-top: 1px solid var(--line);
+}
+
+.creed-mark {
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  padding: clamp(28px, 5vw, 72px);
+  background: var(--tile);
+}
+
+.creed h2 {
+  margin: 0;
+  max-width: 18ch;
+  font-family: var(--display);
+  font-size: clamp(34px, 4vw, 60px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+}
+
+.creed p {
+  max-width: 52ch;
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.creed-tags {
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+}
+
+.creed-tags li {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- steps ---- */
+
+.steps {
+  padding: clamp(46px, 5vw, 72px) var(--pad);
+  border-top: 1px solid var(--line);
+}
+
+.steps-track {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 48px);
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps-track li {
+  counter-increment: step;
+}
+
+.steps-track h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.steps-track h3::before {
+  content: counter(step) ".";
+  margin-right: 8px;
+  color: var(--lime);
+}
+
+.steps-track p {
+  max-width: 40ch;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+/* ---------------------------------------------------------------- store ---- */
+
+.place {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: center;
+  min-height: clamp(320px, 40vw, 460px);
+  padding: clamp(46px, 5vw, 80px) var(--pad);
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  background: #0b0e0a;
+}
+
+.place-map {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.place-map .map-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(242, 245, 237, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(242, 245, 237, 0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.place-map .map-road {
+  position: absolute;
+  height: 1px;
+  background: rgba(168, 249, 0, 0.28);
+}
+
+.place-map .road-one { width: 120%; top: 36%; left: -10%; transform: rotate(-9deg); }
+.place-map .road-two { width: 90%; top: 64%; left: 16%; transform: rotate(6deg); }
+.place-map .road-three { width: 70%; top: 16%; left: 48%; transform: rotate(74deg); }
+
+.place-map .map-pin {
+  position: absolute;
+  top: 46%;
+  left: 62%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 0 7px rgba(168, 249, 0, 0.15), 0 0 0 17px rgba(168, 249, 0, 0.07);
+}
+
+.place-card {
+  width: min(520px, 100%);
+  padding: clamp(26px, 3vw, 42px);
+  border: 1px solid var(--line);
+  background: rgba(8, 10, 8, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.place-card h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(28px, 3.2vw, 44px);
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.place-card > p {
+  max-width: 44ch;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.place-coords {
+  margin: 18px 0 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--lime);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.place-card .button {
+  min-width: 260px;
+}
+
+/* --------------------------------------------------------------- social ---- */
+
+.social {
+  padding: clamp(46px, 5vw, 76px) var(--pad);
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.social p {
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.social-handle {
+  display: inline-block;
+  font-family: var(--display);
+  font-size: clamp(28px, 5vw, 64px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  word-break: break-word;
+  transition: color 200ms ease;
+}
+
+.social-handle:hover {
+  color: var(--lime);
+}
+
+/* ----------------------------------------------------------- responsive ---- */
+
+@media (max-width: 900px) {
+  .creed {
+    grid-template-columns: 1fr;
+  }
+
+  .creed-mark {
+    order: -1;
+    aspect-ratio: 16 / 9;
+  }
+
+  .steps-track {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 720px) {
+  .grid,
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-actions .button,
+  .row-more .button,
+  .place-card .button {
+    min-width: 0;
+    flex: 1 1 160px;
+  }
+
+  .tile {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 460px) {
+  .tiles {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-media img {
+    transition: none;
+  }
+}
