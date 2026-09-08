@@ -9,40 +9,6 @@
   --tile: #101310;
 }
 
-/* ----------------------------------------------------------- page head ---- */
-
-.shop-head {
-  padding: clamp(28px, 4vw, 52px) var(--pad) clamp(20px, 2.6vw, 32px);
-  text-align: center;
-  border-bottom: 1px solid var(--line);
-}
-
-.shop-head h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(28px, 3.4vw, 46px);
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.shop-head p {
-  max-width: 60ch;
-  margin: 12px auto 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.shop-count {
-  margin-top: 14px;
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 /* ------------------------------------------------------ product detail ---- */
 
 .pdp {

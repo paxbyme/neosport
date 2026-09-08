@@ -92,6 +92,7 @@ const productModalBody = document.querySelector("#product-modal-body");
 const accountSlot = document.querySelector("#account");
 const accountOrders = document.querySelector("#account-orders");
 const accountOrdersBody = document.querySelector("#account-orders-body");
+const footerLinks = document.querySelector(".footer-links");
 const CART_STORAGE_KEY = "neosport-cart-v1";
 
 // Filled from /api/products; products are managed in the admin panel.
@@ -616,6 +617,27 @@ const renderAccount = ({ user, googleEnabled, telegramEnabled }) => {
 };
 
 /**
+ * Customers are never told the panel exists: the footer link is built here,
+ * and only once /api/auth/me reports an admin session. The panel itself is
+ * guarded by requireAdmin, so this only keeps the door out of sight.
+ */
+const renderAdminLink = (user) => {
+  const existing = footerLinks?.querySelector("[data-admin-link]");
+  if (!footerLinks || user?.role !== "admin") {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
+
+  const link = document.createElement("a");
+  link.href = "/admin";
+  link.rel = "nofollow";
+  link.dataset.adminLink = "";
+  link.textContent = "Admin";
+  footerLinks.append(link);
+};
+
+/**
  * The bot conversation happens in another tab, so this page asks the server
  * whether the token it holds has been verified. The token is in an HttpOnly
  * cookie, which is why the server reports `waiting` instead of the page
@@ -716,6 +738,7 @@ const loadAccount = async () => {
     const result = await response.json();
     account = result.user || null;
     renderAccount(result);
+    renderAdminLink(account);
 
     // Returning to this tab after talking to the bot: pick the flow back up.
     if (!account) {
