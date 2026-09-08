@@ -449,3 +449,56 @@ export const deleteProduct = async (id, environment = process.env) => {
   await writeLocalProducts(nextProducts);
   await deleteStoredImages(product?.images, environment);
 };
+
+// Categories are stored as text on the product, so the category panel needs a
+// way to count what a name is holding and to rewrite it when it is renamed.
+export const countProductsInCategory = async (category, environment = process.env) => {
+  const name = String(category || "").trim();
+  if (!name) return 0;
+  const config = supabaseConfig(environment);
+
+  if (config) {
+    const rows = await requestSupabase(
+      config,
+      `/rest/v1/products?select=id&category=eq.${encodeURIComponent(name)}`,
+      { headers: { Accept: "application/json" } },
+    );
+    return rows?.length || 0;
+  }
+
+  const products = await readLocalProducts();
+  return products.filter((product) => product.category === name).length;
+};
+
+export const renameProductCategory = async (from, to, environment = process.env) => {
+  const previous = String(from || "").trim();
+  const next = String(to || "").trim();
+  if (!previous || !next || previous === next) return 0;
+
+  const updatedAt = new Date().toISOString();
+  const config = supabaseConfig(environment);
+
+  if (config) {
+    const rows = await requestSupabase(
+      config,
+      `/rest/v1/products?category=eq.${encodeURIComponent(previous)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ category: next, updated_at: updatedAt }),
+      },
+    );
+    return rows?.length || 0;
+  }
+
+  const products = await readLocalProducts();
+  const renamed = products.filter((product) => product.category === previous);
+  if (renamed.length === 0) return 0;
+
+  await writeLocalProducts(
+    products.map((product) =>
+      product.category === previous ? { ...product, category: next, updatedAt } : product,
+    ),
+  );
+  return renamed.length;
+};

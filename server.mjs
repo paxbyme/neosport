@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
+import adminCategoriesHandler from "./api/admin/categories.mjs";
 import adminProductsHandler from "./api/admin/products.mjs";
 import adminStatsHandler from "./api/admin/stats.mjs";
 import authHandler from "./api/auth.mjs";
@@ -63,6 +64,7 @@ createServer(async (request, response) => {
     "/api/order": orderHandler,
     "/api/products": productsHandler,
     "/api/orders": ordersHandler,
+    "/api/admin/categories": adminCategoriesHandler,
     "/api/admin/products": adminProductsHandler,
     "/api/admin/stats": adminStatsHandler,
     "/api/telegram/webhook": telegramWebhookHandler,

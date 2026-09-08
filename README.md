@@ -37,6 +37,18 @@ Katalog bo‘sh holatdan boshlanadi — saytda birorta ham hardcoded mahsulot yo
 
 Admin panelda mahsulot qo‘shish, tahrirlash, faol/nofaol qilish va chegirma e’lon qilish mumkin. Har bir mahsulotga **10 tagacha rasm** yuklash mumkin; birinchisi asosiy hisoblanadi va katalog kartochkasida ko‘rinadi, qolganlari mahsulot oynasida kichik rasmlar sifatida chiqadi. Adminda rasmlarni o‘chirish va istalganini asosiy qilish mumkin. Yuklangan rasm serverda qayta kodlanadi: eni 1280px gacha kichraytiriladi va WebP’ga o‘giriladi (odatda 80%+ hajm kamayadi), shuning uchun katta fotosurat yuklashdan tortinmang. Mahsulot o‘chirilganda yoki galereyadan olib tashlanganda fayl Storage’dan ham o‘chadi. Chegirma foizda kiritiladi (0–90%); yakuniy narx eng yaqin 1000 so‘mga yaxlitlanadi va butun zanjir — do‘kon, savatcha, `/api/order`, Telegram xabari — shu narxdan foydalanadi.
 
+### Kategoriyalar
+
+Kategoriyalar admin panelning alohida bo‘limida (`02 KATEGORIYALAR`) boshqariladi va `categories` jadvalida saqlanadi (lokal rejimda `data/categories.json`). Bo‘lim birinchi ochilganda ro‘yxat o‘zi to‘ldiriladi: ilgari formaga qattiq yozilgan nomlar hamda katalogdagi mahsulotlarda uchraydigan har qanday boshqa kategoriya kiritiladi.
+
+Har bir kategoriyaning **o‘lcham turi** bor — «Kiyim» (S–4XL) yoki «Oyoq kiyim» (36–45). Mahsulot formasidagi o‘lchamlar ro‘yxati shu turdan kelib chiqadi, ya’ni yangi qo‘shilgan kategoriya ham darrov to‘g‘ri o‘lchamlarni taklif qiladi. Bo‘limda kategoriyani qo‘shish, nomini va turini tahrirlash, tartibini ↑↓ bilan o‘zgartirish, nofaol qilish va o‘chirish mumkin:
+
+- **Nomini o‘zgartirish** — o‘sha kategoriyadagi barcha mahsulotlar avtomatik yangi nomga o‘tadi (mahsulotda kategoriya matn sifatida saqlanadi).
+- **Nofaol qilish** — kategoriya yangi mahsulot formasida ko‘rinmaydi, lekin mavjud mahsulotlar o‘z nomini saqlab qoladi.
+- **O‘chirish** — faqat kategoriyada mahsulot qolmagan bo‘lsa ishlaydi; aks holda nechta mahsulot borligi aytiladi.
+
+API: `GET/POST/PATCH/DELETE /api/admin/categories` (admin huquqi talab qilinadi).
+
 ## Kirish (Google va Telegram)
 
 Saytda ham mijozlar, ham admin **Google hisobi** bilan kiradi. Oqim serverda kechadi: `/api/auth/login` PKCE bilan Supabase Auth'ga yo‘naltiradi, `/api/auth/callback` kodni almashtiradi va imzolangan **HttpOnly** cookie o‘rnatadi. Token brauzer JavaScript'iga hech qachon tushmaydi.

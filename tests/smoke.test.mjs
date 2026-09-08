@@ -4,6 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { requireAdmin } from "../admin-auth.mjs";
 import { createTelegramOrder } from "../order-service.mjs";
+import { createCategory, deleteCategory, updateCategory } from "../category-service.mjs";
 import { createProduct, effectivePrice, MAX_DISCOUNT_PERCENT, MAX_IMAGES, updateProduct } from "../product-service.mjs";
 import { buildStats } from "../stats-service.mjs";
 import {
@@ -113,9 +114,11 @@ test("numbering appears only on the ordered buying steps", () => {
 test("shop uses the same retail layout system as the landing page", () => {
   assert.match(shopHtml, /<link rel="stylesheet" href="shop\.css" \/>/);
 
-  // Compact page head instead of the old full-height hero.
-  assert.match(shopHtml, /class="shop-head"/);
-  assert.doesNotMatch(shopHtml, /shop-page-hero|shop-page-glow|shop-page-tags/);
+  // No page head at all: the catalog starts straight under the header and the
+  // only h1 left on the page is there for screen readers.
+  assert.doesNotMatch(shopHtml, /shop-head|shop-page-hero|shop-page-glow|shop-page-tags/);
+  assert.doesNotMatch(shopCss, /\.shop-head|\.shop-count/);
+  assert.match(shopHtml, /<h1 class="sr-only" id="shop-hero-title">/);
 
   // Product detail is rendered into the modal: image column beside a sticky buy panel.
   assert.match(script, /<article class="pdp">/);
@@ -1001,12 +1004,21 @@ test("footwear is sized in EU numbers and clothing in letters", () => {
   const adminScript = read("admin.js");
   const adminHtml = read("admin.html");
 
-  // Both sets exist and the shoe categories that select them are listed.
+  // Both sets exist, and the size set now follows the category record rather
+  // than a hard-coded list of names.
   assert.match(adminScript, /shoes: \["36", "37", "38", "39", "40", "41", "42", "43", "44", "45"\]/);
   assert.match(adminScript, /clothing: \["S", "M", "L", "XL", "2XL", "3XL", "4XL"\]/);
+  assert.match(adminScript, /findCategory\(category\)\?\.sizeType === "shoes"/);
+  assert.match(adminHtml, /<select name="category" id="product-category" required>/);
+  assert.match(adminScript, /const renderCategoryOptions = /);
+
+  const categoryService = read("category-service.mjs");
   for (const category of ["Krossovka", "Botinka", "Shippak"]) {
-    assert.match(adminScript, new RegExp(`SHOE_CATEGORIES[\\s\\S]*?"${category}"`), `${category} must pick shoe sizes`);
-    assert.match(adminHtml, new RegExp(`<option>${category}</option>`), `${category} must be offered`);
+    assert.match(
+      categoryService,
+      new RegExp(`\\{ name: "${category}", sizeType: "shoes" \\}`),
+      `${category} must be seeded as footwear`,
+    );
   }
 
   // Changing category re-renders the list rather than leaving stale boxes.
@@ -1017,6 +1029,79 @@ test("footwear is sized in EU numbers and clothing in letters", () => {
   const service = read("product-service.mjs");
   assert.match(service, /\/\^\[A-Z0-9\]\{1,4\}\$\//);
   assert.match(read("script.js"), /\/\^\[A-Z0-9\]\{1,4\}\$\//);
+});
+
+test("categories are managed from their own admin section", async () => {
+  const adminHtml = read("admin.html");
+  const adminScript = read("admin.js");
+
+  // The panel has a section of its own, between the statistics and the form.
+  assert.match(adminHtml, /<section class="category-section"/);
+  assert.match(adminHtml, /id="category-list"/);
+  assert.match(adminHtml, /<div><span>02<\/span><h2 id="category-title">KATEGORIYALAR<\/h2><\/div>/);
+  assert.match(adminHtml, /<div><span>03<\/span><h2 id="product-form-title">/);
+  assert.match(adminHtml, /<div><span>04<\/span><h2 id="product-list-title">/);
+  assert.match(adminScript, /const renderCategories = /);
+  assert.match(adminScript, /\/api\/admin\/categories/);
+  assert.match(read("admin.css"), /\.admin-category \{/);
+  assert.match(read("supabase-schema.sql"), /create table if not exists public\.categories/);
+
+  const environment = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-service-key",
+  };
+  const categoryRows = [
+    { id: "category-1", name: "Krossovka", size_type: "shoes", position: 0, active: true, created_at: "2026-01-01T00:00:00.000Z" },
+  ];
+
+  const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  const originalFetch = globalThis.fetch;
+  let productRows = [];
+  let productPatch = null;
+
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    const method = options.method || "GET";
+
+    if (target.includes("/rest/v1/categories")) {
+      if (method === "GET") return json(categoryRows);
+      if (method === "PATCH") return json([{ ...categoryRows[0], ...JSON.parse(options.body) }]);
+      if (method === "DELETE") return new Response(null, { status: 204 });
+    }
+    if (target.includes("/rest/v1/products")) {
+      if (method === "PATCH") {
+        productPatch = { target, body: JSON.parse(options.body) };
+        return json(productRows);
+      }
+      return json(productRows);
+    }
+    throw new Error(`unexpected request to ${target}`);
+  };
+
+  try {
+    // A rename has to travel to every product wearing the old category name,
+    // because products store it as text.
+    productRows = [{ id: "product-1" }];
+    const renamed = await updateCategory("category-1", { name: "Krossovkalar", sizeType: "shoes" }, environment);
+    assert.equal(renamed.name, "Krossovkalar");
+    assert.match(productPatch.target, /category=eq\.Krossovka/);
+    assert.equal(productPatch.body.category, "Krossovkalar");
+
+    // Two categories with the same name would make the product select ambiguous.
+    await assert.rejects(
+      () => createCategory({ name: "krossovka", sizeType: "shoes" }, environment),
+      /allaqachon mavjud/,
+    );
+
+    // Deleting a category in use would strand those products on a label the
+    // panel no longer offers.
+    await assert.rejects(() => deleteCategory("category-1", environment), /1 ta mahsulot/);
+
+    productRows = [];
+    await assert.doesNotReject(() => deleteCategory("category-1", environment));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 /* -------------------------------------------------------- Telegram login -- */

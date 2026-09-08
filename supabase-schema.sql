@@ -28,6 +28,25 @@ update public.products
    set images = jsonb_build_array(image_url)
  where jsonb_array_length(images) = 0 and image_url is not null and image_url <> '';
 
+-- The category list the admin panel manages. Products keep the category name
+-- as text, so renaming a row here rewrites every product wearing the old name.
+create table if not exists public.categories (
+  id text primary key,
+  name text not null,
+  -- Decides which size set the product form offers: letters or EU numbers.
+  size_type text not null default 'clothing' check (size_type in ('clothing', 'shoes')),
+  -- The order the panel and the category select show them in.
+  position integer not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
+);
+
+-- Two categories with the same name would make the product select ambiguous.
+create unique index if not exists categories_name_idx on public.categories (lower(name));
+
+alter table public.categories enable row level security;
+
 create table if not exists public.orders (
   id text primary key,
   created_at timestamptz not null default now(),

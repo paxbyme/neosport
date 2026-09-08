@@ -10,3 +10,6 @@ data/orders.json
 # Every local env file stays out, but the template belongs in the repo.
 .env*
 !.env.example
+
+# The local category store seeds itself from category-service.mjs on first run.
+data/categories.json
