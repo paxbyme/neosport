@@ -575,6 +575,15 @@ const TELEGRAM_MARK = `
     <path fill="#fff" d="M16.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
   </svg>`;
 
+// The session stores digits only; the form shows the number the way it is
+// written locally, and the server normalizes it back on submit.
+const formatPhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  return /^998\d{9}$/.test(digits)
+    ? `+${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10)}`
+    : digits && `+${digits}`;
+};
+
 let account = null;
 
 const renderAccount = ({ user, googleEnabled, telegramEnabled }) => {
@@ -592,7 +601,7 @@ const renderAccount = ({ user, googleEnabled, telegramEnabled }) => {
   if (user) {
     accountSlot.innerHTML = `<span class="account-user">
         ${user.picture ? `<img src="${escapeHtml(user.picture)}" alt="" width="24" height="24" referrerpolicy="no-referrer" />` : ""}
-        <span class="account-name">${escapeHtml(user.name || user.email || user.phone)}</span>
+        <span class="account-name">${escapeHtml(user.name || user.email || formatPhone(user.phone))}</span>
       </span>
       <a class="account-logout" href="/api/auth/logout?next=${next}">Chiqish</a>`;
     return;
@@ -713,9 +722,12 @@ const loadAccount = async () => {
       if (await checkTelegramLogin()) waitForTelegram();
       return;
     }
-    // Google gives us a name but never a phone number, so only one field fills in.
+    // Whatever the account knows, the customer should not have to retype.
+    // Google gives a name only; a Telegram sign-up gives a verified phone too.
     const nameInput = checkoutForm?.elements.namedItem("name");
     if (nameInput && !nameInput.value) nameInput.value = account.name || "";
+    const phoneInput = checkoutForm?.elements.namedItem("phone");
+    if (phoneInput && !phoneInput.value && account.phone) phoneInput.value = formatPhone(account.phone);
     await loadAccountOrders();
   } catch (error) {
     console.warn(error.message);

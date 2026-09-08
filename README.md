@@ -23,6 +23,9 @@ Admin panel: `http://localhost:4173/admin`
 - `TELEGRAM_BOT_TOKEN` — BotFather bergan token.
 - `TELEGRAM_CHAT_ID` — buyurtmalar keladigan Telegram chat yoki guruh IDsi.
 - `TELEGRAM_MESSAGE_THREAD_ID` — ixtiyoriy, forum guruhidagi topic IDsi.
+- `TELEGRAM_WEBHOOK_SECRET` — Telegram kirish webhook'ini himoyalaydi; kamida 16 belgi. Sozlanmagan bo‘lsa webhook har qanday so‘rovni rad etadi.
+- `ADMIN_PHONES` — Telegram orqali kirganda admin huquqi beriladigan raqamlar (vergul bilan). Har qanday yozilishi mumkin: `+998901234567`, `998901234567`, `901234567`.
+- `SITE_URL` — bot xabaridagi va webhook manzilidagi absolyut sayt manzili.
 - `SUPABASE_URL` va `SUPABASE_SERVICE_ROLE_KEY` — production mahsulotlar bazasi.
 - `SUPABASE_STORAGE_BUCKET` — mahsulot rasmlari uchun public bucket; standart qiymat `product-images`.
 
@@ -34,7 +37,7 @@ Katalog bo‘sh holatdan boshlanadi — saytda birorta ham hardcoded mahsulot yo
 
 Admin panelda mahsulot qo‘shish, tahrirlash, faol/nofaol qilish va chegirma e’lon qilish mumkin. Har bir mahsulotga **10 tagacha rasm** yuklash mumkin; birinchisi asosiy hisoblanadi va katalog kartochkasida ko‘rinadi, qolganlari mahsulot oynasida kichik rasmlar sifatida chiqadi. Adminda rasmlarni o‘chirish va istalganini asosiy qilish mumkin. Yuklangan rasm serverda qayta kodlanadi: eni 1280px gacha kichraytiriladi va WebP’ga o‘giriladi (odatda 80%+ hajm kamayadi), shuning uchun katta fotosurat yuklashdan tortinmang. Mahsulot o‘chirilganda yoki galereyadan olib tashlanganda fayl Storage’dan ham o‘chadi. Chegirma foizda kiritiladi (0–90%); yakuniy narx eng yaqin 1000 so‘mga yaxlitlanadi va butun zanjir — do‘kon, savatcha, `/api/order`, Telegram xabari — shu narxdan foydalanadi.
 
-## Kirish (Google)
+## Kirish (Google va Telegram)
 
 Saytda ham mijozlar, ham admin **Google hisobi** bilan kiradi. Oqim serverda kechadi: `/api/auth/login` PKCE bilan Supabase Auth'ga yo‘naltiradi, `/api/auth/callback` kodni almashtiradi va imzolangan **HttpOnly** cookie o‘rnatadi. Token brauzer JavaScript'iga hech qachon tushmaydi.
 
@@ -48,6 +51,25 @@ Saytda ham mijozlar, ham admin **Google hisobi** bilan kiradi. Oqim serverda kec
 1. Authentication → Providers → **Google** ni yoqing va Google Cloud Console'dan olingan Client ID / Secret'ni kiriting.
 2. Google Cloud Console'da **Authorized redirect URI** sifatida Supabase bergan `https://<loyiha>.supabase.co/auth/v1/callback` manzilini qo‘shing.
 3. Supabase → Authentication → URL Configuration → **Redirect URLs** ga saytingizning callback manzilini qo‘shing: `https://<domen>/api/auth/callback` (va lokal ish uchun `http://localhost:4173/api/auth/callback`).
+
+### Telegram orqali ro‘yxatdan o‘tish
+
+Email'i yo‘q mijoz uchun ikkinchi yo‘l: **telefon raqamini Telegram bot orqali tasdiqlash**. Bu yerda ro‘yxatdan o‘tish va kirish bitta harakat — kontaktni ulashish.
+
+1. Mijoz «Telegram» tugmasini bosadi. `/api/auth/telegram/start` bir martalik token yaratadi (`login_tokens`), uni **HttpOnly** cookie'ga yozadi va `t.me/<bot>?start=<token>` ga yo‘naltiradi.
+2. Botdagi `/start <token>` webhook'ga keladi. Token qaysi chat ochganini yozib qo‘yadi — kontakt keyin **alohida** webhook chaqiruvida, boshqa instance'da kelishi mumkin.
+3. Mijoz «📱 Telefon raqamni ulashish» tugmasini bosadi. Server kontakt egasi yuboruvchining o‘zi ekanini tekshiradi (birovning kontakt kartasi bilan kirib bo‘lmaydi), tokenni tasdiqlangan deb belgilaydi va mijozni `users` jadvaliga yozadi. Birinchi marta — ro‘yxatdan o‘tish, keyingilarida faqat `last_login_at` yangilanadi.
+4. Ortda qolgan sahifa `/api/auth/telegram/status` ni so‘rab turadi. Token bir marta sarflanadi va sessiya cookie'si o‘rnatiladi.
+
+Token 10 daqiqa yashaydi, eskirganlari keyingi kirishda tozalanadi. Sessiyada email o‘rniga tasdiqlangan raqam turadi: u savatchadagi telefon maydonini to‘ldiradi, buyurtmaga `user_phone` bo‘lib yoziladi va operatorga ketadigan xabarda «Tasdiqlangan hisob» qatorida ko‘rinadi. `ADMIN_PHONES` dagi raqam bilan kirgan odam admin bo‘ladi.
+
+Webhook'ni ro‘yxatdan o‘tkazish (bot tokeni bo‘lgan muhitda bir marta, keyin domen yoki sir o‘zgarganda):
+
+```bash
+npm run telegram:setup
+```
+
+Bu `setWebhook` ni `<SITE_URL>/api/telegram/webhook` manziliga chaqiradi va `getWebhookInfo` natijasini ko‘rsatadi. `vercel env pull` production sirlarini `[SENSITIVE]` qilib beradi, shuning uchun buyruqni ishlatish uchun `TELEGRAM_BOT_TOKEN` va `TELEGRAM_WEBHOOK_SECRET` ni Development muhitiga ham qo‘shing.
 
 ## Statistika
 

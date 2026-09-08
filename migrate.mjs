@@ -39,9 +39,10 @@ try {
   console.log("Sxema qo‘llandi.");
 
   const { rows } = await client.query(`
-    select table_name, (select count(*) from information_schema.columns c where c.table_name = t.table_name) as columns
+    select table_name, (select count(*) from information_schema.columns c
+       where c.table_schema = t.table_schema and c.table_name = t.table_name) as columns
     from information_schema.tables t
-    where table_schema = 'public' and table_name in ('products', 'orders')
+    where table_schema = 'public' and table_name in ('products', 'orders', 'users', 'login_tokens')
     order by table_name`);
   for (const row of rows) console.log(`  ${row.table_name}: ${row.columns} ta ustun`);
 } catch (error) {

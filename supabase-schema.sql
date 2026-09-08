@@ -40,16 +40,41 @@ create table if not exists public.orders (
   total bigint not null
 );
 
--- Existing installations: link orders to the Google account that placed them.
+-- Existing installations: link orders to the account that placed them. A
+-- Google account is known by its email, a Telegram one by its phone number, so
+-- both columns are optional and an order may carry either.
 alter table public.orders
   add column if not exists user_id text,
-  add column if not exists user_email text;
+  add column if not exists user_email text,
+  add column if not exists user_phone text;
 
 -- A customer's order history is looked up by account.
 create index if not exists orders_user_id_idx on public.orders (user_id);
 
 -- Statistics read the newest orders first.
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
+
+-- One row per registered customer. Sharing a contact with the bot is both the
+-- sign-up and the sign-in, so this table is written the moment a phone number
+-- is verified. The session cookie is proof of identity on its own; this row is
+-- what makes a returning customer recognisable and countable.
+create table if not exists public.users (
+  -- "tg:<chat_id>", the same value orders.user_id carries.
+  id text primary key,
+  phone text not null,
+  full_name text not null default '',
+  telegram_chat_id text,
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz not null default now()
+);
+
+-- Deliberately not unique: one person may hold two Telegram accounts on the
+-- same number, and a unique index would turn their second sign-in into an error.
+create index if not exists users_phone_idx on public.users (phone);
+
+create index if not exists users_created_at_idx on public.users (created_at desc);
+
+alter table public.users enable row level security;
 
 -- One row per Telegram sign-in attempt. The browser holds the token in an
 -- HttpOnly cookie; the bot fills in who verified it.

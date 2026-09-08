@@ -21,6 +21,14 @@ const escapeTelegramHtml = (value) =>
 
 const formatMoney = (amount) => `${new Intl.NumberFormat("uz-UZ").format(amount)} so‘m`;
 
+// Stored digits-only, shown the way the number is written: +998 90 123 45 67.
+const formatPhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  return /^998\d{9}$/.test(digits)
+    ? `+${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10)}`
+    : `+${digits}`;
+};
+
 const validateCustomer = (payload) => {
   if (String(payload?.website || "").trim()) throw new OrderError("Buyurtma qabul qilinmadi.");
 
@@ -79,7 +87,7 @@ const buildTelegramMessage = ({ orderId, customer, items, total, createdAt, acco
     `Buyurtma: <code>${escapeTelegramHtml(orderId)}</code>\n\n` +
     `👤 <b>Mijoz:</b> ${escapeTelegramHtml(customer.name)}\n` +
     `📞 <b>Telefon:</b> ${escapeTelegramHtml(customer.phone)}\n` +
-    (account ? `✉️ <b>Hisob:</b> ${escapeTelegramHtml(account)}\n` : "") +
+    (account ? `🔐 <b>Tasdiqlangan hisob:</b> ${escapeTelegramHtml(account)}\n` : "") +
     `\n` +
     `${itemLines}\n\n` +
     `💰 <b>Jami: ${formatMoney(total)}</b>\n` +
@@ -101,7 +109,10 @@ export const createTelegramOrder = async (payload, environment = process.env, us
     timeStyle: "short",
     timeZone: "Asia/Tashkent",
   }).format(new Date());
-  const text = buildTelegramMessage({ orderId, customer, items, total, createdAt, account: user?.email || "" });
+  // Google identifies an account by email, Telegram by a verified phone
+  // number; the notification shows whichever one placed the order.
+  const account = user?.email || (user?.phone ? formatPhone(user.phone) : "");
+  const text = buildTelegramMessage({ orderId, customer, items, total, createdAt, account });
 
   const body = { chat_id: chatId, text, parse_mode: "HTML" };
   if (environment.TELEGRAM_MESSAGE_THREAD_ID) body.message_thread_id = Number(environment.TELEGRAM_MESSAGE_THREAD_ID);
@@ -136,6 +147,7 @@ export const createTelegramOrder = async (payload, environment = process.env, us
         customerPhone: customer.phone,
         userId: user?.id || null,
         userEmail: user?.email || null,
+        userPhone: user?.phone || null,
         items: items.map((item) => ({
           productId: item.product.id,
           name: item.product.name,

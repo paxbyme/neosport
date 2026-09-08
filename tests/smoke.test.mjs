@@ -19,6 +19,7 @@ import { callTelegram, isTelegramAuthConfigured, verifyWebhookSecret } from "../
 import { callbackUrl, googleAuthorizeUrl, isAuthConfigured } from "../auth-service.mjs";
 import { resetRateLimits } from "../rate-limit.mjs";
 import { supabaseRequest } from "../supabase.mjs";
+import { registerTelegramUser, telegramUserId } from "../user-service.mjs";
 
 const fakeRequest = (headers = {}) => ({ headers, socket: { remoteAddress: "203.0.113.7" } });
 
@@ -1109,6 +1110,61 @@ test("the Telegram flow is stateless and only accepts your own contact", () => {
   assert.match(read("auth-routes.mjs"), /telegramEnabled/);
   assert.match(read("admin.js"), /telegramSignin/);
   assert.match(script, /data-telegram-signin/);
+});
+
+test("sharing a contact registers the customer once and refreshes them after that", async () => {
+  const supabase = { SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "key" };
+  const calls = [];
+
+  const run = (known) =>
+    withStubbedFetch(async (url, options) => {
+      calls.push({ url: String(url), method: options.method || "GET", body: options.body, prefer: options.headers?.Prefer });
+      if ((options.method || "GET") === "GET") {
+        return new Response(JSON.stringify(known ? [{ id: known }] : []), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("", { status: 201 });
+    }, () => registerTelegramUser({ chatId: 55, phone: "+998 90 123 45 67", name: "Sinov" }, supabase));
+
+  const first = await run(null);
+  assert.equal(first.id, telegramUserId(55));
+  assert.equal(first.isNew, true, "an unknown chat is a sign-up");
+
+  const write = calls.find((call) => call.method === "POST");
+  const row = JSON.parse(write.body);
+  assert.equal(row.phone, "998901234567", "every spelling of the number is stored the same way");
+  assert.equal(row.id, "tg:55");
+  assert.ok(!("created_at" in row), "the sign-up date must survive a later sign-in");
+  assert.match(write.prefer, /merge-duplicates/, "two taps of the button must merge, not collide");
+
+  const second = await run("tg:55");
+  assert.equal(second.isNew, false, "a known chat is signing in, not signing up");
+
+  // A registration that cannot be written must not cost the customer the
+  // sign-in the session cookie already grants them.
+  const webhook = read("api/telegram/webhook.mjs");
+  assert.match(webhook, /catch[\s\S]{0,120}could not be registered/);
+  assert.match(webhook, /Ro‘yxatdan o‘tdingiz/);
+});
+
+test("a verified phone number reaches the checkout form and the order behind it", () => {
+  // The point of asking for the contact is that the customer never retypes it.
+  assert.match(script, /namedItem\("phone"\)[\s\S]{0,120}account\.phone/);
+  assert.match(script, /const formatPhone =/);
+
+  // An order placed by a Telegram account is attributable to it: Google has an
+  // email, Telegram a phone, and the notification names whichever signed in.
+  assert.match(read("order-service.mjs"), /userPhone: user\?\.phone \|\| null/);
+  assert.match(read("order-service.mjs"), /user\?\.email \|\| \(user\?\.phone/);
+  assert.match(read("order-store.mjs"), /user_phone: order\.userPhone/);
+  assert.match(read("supabase-schema.sql"), /add column if not exists user_phone text/);
+
+  // The registration table and the id orders carry must stay the same value.
+  assert.match(read("supabase-schema.sql"), /create table if not exists public\.users/);
+  assert.equal(telegramUserId(7), "tg:7");
+  assert.match(read("telegram-auth.mjs"), /id: telegramUserId\(used\.chat_id\)/);
 });
 
 test("a minimal Supabase response is not mistaken for a failure", async () => {

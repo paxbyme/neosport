@@ -17,6 +17,7 @@ const normalizeOrder = (row) => ({
   customerPhone: row.customer_phone ?? row.customerPhone ?? "",
   userId: row.user_id ?? row.userId ?? null,
   userEmail: row.user_email ?? row.userEmail ?? null,
+  userPhone: row.user_phone ?? row.userPhone ?? null,
   items: Array.isArray(row.items) ? row.items : [],
   total: Number(row.total) || 0,
 });
@@ -28,6 +29,7 @@ const toDatabaseRow = (order) => ({
   customer_phone: order.customerPhone,
   user_id: order.userId ?? null,
   user_email: order.userEmail ?? null,
+  user_phone: order.userPhone ?? null,
   items: order.items,
   total: order.total,
 });

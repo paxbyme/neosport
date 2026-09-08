@@ -7,6 +7,7 @@ import {
   markTokenVerified,
   verifyWebhookSecret,
 } from "../../telegram-auth.mjs";
+import { registerTelegramUser } from "../../user-service.mjs";
 
 const SITE_NAME = "NeoSport";
 
@@ -89,13 +90,25 @@ export default async function handler(request, response) {
         return done();
       }
 
-      await markTokenVerified(pending.token, {
-        chatId,
-        phone: contact.phone_number,
-        name: [contact.first_name, contact.last_name].filter(Boolean).join(" "),
-      });
+      const name = [contact.first_name, contact.last_name].filter(Boolean).join(" ");
+      await markTokenVerified(pending.token, { chatId, phone: contact.phone_number, name });
 
-      await reply(chatId, `✅ Tasdiqlandi. Saytga qayting — kirish avtomatik yakunlanadi.\n\n${siteUrl()}`, {
+      // The contact is the sign-up: this is the first moment the number is
+      // proven, so the customer record is written here rather than when the
+      // browser comes back for its session. A failure to record it must not
+      // cost the customer their sign-in — the session cookie stands alone.
+      let registration = null;
+      try {
+        registration = await registerTelegramUser({ chatId, phone: contact.phone_number, name });
+      } catch (error) {
+        console.error("Telegram customer could not be registered", chatId, error.message);
+      }
+
+      const greeting = registration?.isNew
+        ? `✅ Ro‘yxatdan o‘tdingiz${name ? `, ${name}` : ""}!`
+        : `✅ Tasdiqlandi. Xush kelibsiz${name ? `, ${name}` : ""}!`;
+
+      await reply(chatId, `${greeting} Saytga qayting — kirish avtomatik yakunlanadi.\n\n${siteUrl()}`, {
         reply_markup: { remove_keyboard: true },
       });
       return done();

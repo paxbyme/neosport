@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { AuthError, normalizePhone } from "./auth-session.mjs";
 import { supabaseConfig, supabaseRequest } from "./supabase.mjs";
+import { telegramUserId } from "./user-service.mjs";
 
 export const TELEGRAM_COOKIE = "ns_tg";
 // Long enough to switch apps, share a contact and come back; short enough that
@@ -149,7 +150,7 @@ export const consumeVerifiedToken = async (token, environment = process.env) => 
   const used = rows[0];
   return {
     user: {
-      id: `tg:${used.chat_id}`,
+      id: telegramUserId(used.chat_id),
       phone: normalizePhone(used.phone),
       name: used.full_name || "",
       email: "",
