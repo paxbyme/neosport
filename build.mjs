@@ -10,11 +10,12 @@ const files = [
   "landing.css",
   "shop.css",
   "script.js",
+  "storefront-ui.js",
   "admin.html",
   "admin.css",
   "admin.js",
 ];
-const assets = ["neosport-hero.png", "neosport-hero.webp", "neosport-mark.png", "neosport-mark.webp"];
+const assets = ["neosport-hero.png", "neosport-hero.webp", "neosport-mark.png", "neosport-mark.webp", "icons.svg", "lucide-LICENSE"];
 
 rmSync(output, { recursive: true, force: true });
 mkdirSync(output, { recursive: true });

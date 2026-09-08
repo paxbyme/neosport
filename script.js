@@ -4,8 +4,40 @@ const header = document.querySelector("#site-header");
 const menuButton = document.querySelector(".menu-toggle");
 const menuLabel = menuButton?.querySelector(".sr-only");
 const nav = document.querySelector("#site-nav");
-const navLinks = [...document.querySelectorAll(".site-nav a")];
+const navLinks = [...document.querySelectorAll(".site-nav a, .sidebar-nav a, .sidebar-contact")];
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isShopPage = document.body.classList.contains("shop-page");
+const desktopCartMedia = window.matchMedia("(min-width: 1200px)");
+const hasDesktopCart = () => isShopPage && desktopCartMedia.matches;
+const menuBackdrop = document.querySelector(".menu-backdrop");
+let inertElements = [];
+
+// Inert siblings at every ancestor level also cover drawers inside the shop grid.
+const isolateSurface = (surface) => {
+  inertElements.forEach(([element, wasInert]) => { element.inert = wasInert; });
+  inertElements = [];
+  for (let node = surface; node && node !== document.body; node = node.parentElement) {
+    for (const sibling of node.parentElement.children) {
+      if (sibling === node || !(sibling instanceof HTMLElement) || sibling.tagName === "SCRIPT") continue;
+      inertElements.push([sibling, sibling.inert]);
+      sibling.inert = true;
+    }
+  }
+};
+
+const trapFocus = (event, surface) => {
+  if (event.key !== "Tab") return;
+  const focusable = [...surface.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')]
+    .filter((element) => element.getClientRects().length && element.tabIndex !== -1);
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!first) return;
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === surface)) {
+    event.preventDefault(); last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === surface)) {
+    event.preventDefault(); first.focus();
+  }
+};
 
 const setMenuState = (open, restoreFocus = false) => {
   menuButton?.setAttribute("aria-expanded", String(open));
@@ -13,7 +45,17 @@ const setMenuState = (open, restoreFocus = false) => {
   if (menuLabel) menuLabel.textContent = open ? "Menyuni yopish" : "Menyuni ochish";
   nav?.classList.toggle("is-open", open);
   document.body.classList.toggle("menu-open", open);
-
+  if (menuBackdrop) menuBackdrop.hidden = !open;
+  if (open) {
+    nav?.setAttribute("role", "dialog");
+    nav?.setAttribute("aria-modal", "true");
+    isolateSurface(nav);
+    nav?.querySelector("button, a")?.focus();
+  } else {
+    nav?.removeAttribute("role");
+    nav?.removeAttribute("aria-modal");
+    isolateSurface(null);
+  }
   if (!open && restoreFocus) menuButton?.focus();
 };
 
@@ -23,14 +65,16 @@ menuButton?.addEventListener("click", () => {
 });
 
 navLinks.forEach((link) => link.addEventListener("click", () => setMenuState(false)));
+document.querySelectorAll("[data-menu-close]").forEach((button) => button.addEventListener("click", () => setMenuState(false, true)));
 
 document.addEventListener("keydown", (event) => {
+  if (menuButton?.getAttribute("aria-expanded") === "true" && nav) trapFocus(event, nav);
   if (event.key !== "Escape" || menuButton?.getAttribute("aria-expanded") !== "true") return;
   setMenuState(false, true);
 });
 
 window.addEventListener("resize", () => {
-  if (window.innerWidth > 900 && menuButton?.getAttribute("aria-expanded") === "true") {
+  if (window.innerWidth >= (isShopPage ? 768 : 901) && menuButton?.getAttribute("aria-expanded") === "true") {
     setMenuState(false);
   }
 });
@@ -98,7 +142,7 @@ const CART_STORAGE_KEY = "neosport-cart-v1";
 // Filled from /api/products; products are managed in the admin panel.
 const catalogue = {};
 
-const formatMoney = (amount) => `${new Intl.NumberFormat("uz-UZ").format(amount)} SO‘M`;
+const formatMoney = (amount) => `${new Intl.NumberFormat("uz-UZ").format(amount)} so‘m`;
 const cartItemKey = (item) => `${item.productId}|${item.color}|${item.size}`;
 const escapeHtml = (value) =>
   String(value)
@@ -157,6 +201,14 @@ let modalProductId = null;
 let modalQuantity = 1;
 let lastModalFocus = null;
 let closeModalTimer = null;
+let toastTimer = null;
+const announce = (message) => {
+  const toast = document.querySelector("#storefront-toast");
+  if (!toast) return;
+  window.clearTimeout(toastTimer);
+  toast.textContent = message;
+  toastTimer = window.setTimeout(() => { toast.textContent = ""; }, 3500);
+};
 
 const saveCart = () => {
   try {
@@ -181,6 +233,7 @@ const renderCart = () => {
 
   cartEmptyElement.hidden = cart.length > 0;
   checkoutButton.disabled = cart.length === 0;
+  checkoutForm.querySelector(".checkout-fields").hidden = cart.length === 0;
   cartTotalElement.textContent = formatMoney(total);
   cartItemsElement.innerHTML = cart
     .map((item) => {
@@ -193,17 +246,15 @@ const renderCart = () => {
           <div class="cart-item-info">
             <p class="cart-item-brand">${escapeHtml(product.brand.toUpperCase())}</p>
             <h3>${escapeHtml(product.name)}</h3>
-            <p class="cart-item-variant">Rang: ${escapeHtml(color.label)}<br />O‘lcham: ${escapeHtml(item.size)}</p>
+            <p class="cart-item-variant">${escapeHtml(color.label)} · ${escapeHtml(item.size)}</p>
+            <div class="cart-quantity" role="group" aria-label="${escapeHtml(product.name)} soni">
+              <button type="button" data-cart-action="decrease" aria-label="Soni kamaytirish" title="Kamaytirish"${item.quantity === 1 ? " disabled" : ""}>${icon("minus")}</button>
+              <span>${item.quantity}</span>
+              <button type="button" data-cart-action="increase" aria-label="Soni oshirish" title="Oshirish"${item.quantity === 10 ? " disabled" : ""}>${icon("plus")}</button>
+            </div>
             <p class="cart-item-price">${formatMoney(product.price * item.quantity)}</p>
           </div>
-          <div class="cart-item-actions">
-            <button class="cart-remove" type="button" data-cart-action="remove" aria-label="${escapeHtml(product.name)}ni savatchadan o‘chirish">×</button>
-            <div class="cart-quantity" aria-label="${escapeHtml(product.name)} soni">
-              <button type="button" data-cart-action="decrease" aria-label="Soni kamaytirish">−</button>
-              <span>${item.quantity}</span>
-              <button type="button" data-cart-action="increase" aria-label="Soni oshirish">+</button>
-            </div>
-          </div>
+          <button class="cart-remove icon-button" type="button" data-cart-action="remove" aria-label="${escapeHtml(product.name)}ni savatchadan o‘chirish" title="O‘chirish">${icon("trash-2")}</button>
         </article>`;
     })
     .join("");
@@ -211,18 +262,25 @@ const renderCart = () => {
 
 const openCart = () => {
   if (!cartLayer || !cartDrawer) return;
+  if (hasDesktopCart()) {
+    document.body.classList.remove("cart-open");
+    isolateSurface(null);
+    return;
+  }
   if (closeCartTimer) window.clearTimeout(closeCartTimer);
   lastFocusedElement = document.activeElement;
   cartLayer.hidden = false;
   document.body.classList.add("cart-open");
+  isolateSurface(cartLayer);
   window.requestAnimationFrame(() => cartLayer.classList.add("is-open"));
   cartDrawer.querySelector(".cart-close")?.focus();
 };
 
 const closeCart = (restoreFocus = true) => {
-  if (!cartLayer || cartLayer.hidden) return;
+  if (!cartLayer || cartLayer.hidden || hasDesktopCart()) return;
   cartLayer.classList.remove("is-open");
   document.body.classList.remove("cart-open");
+  isolateSurface(null);
 
   const finish = () => {
     cartLayer.hidden = true;
@@ -230,8 +288,30 @@ const closeCart = (restoreFocus = true) => {
   };
 
   if (reduceMotion) finish();
-  else closeCartTimer = window.setTimeout(finish, 290);
+  else closeCartTimer = window.setTimeout(finish, 180);
 };
+
+const syncCartLayout = () => {
+  if (!cartLayer || !cartDrawer) return;
+  window.clearTimeout(closeCartTimer);
+  const wasOpen = document.body.classList.contains("cart-open") && productModal.hidden;
+  if (hasDesktopCart()) {
+    cartLayer.hidden = false;
+    cartDrawer.setAttribute("role", "complementary");
+    cartDrawer.removeAttribute("aria-modal");
+    cartLayer.classList.remove("is-open");
+    if (wasOpen) { document.body.classList.remove("cart-open"); isolateSurface(null); cartDrawer.focus(); }
+  } else {
+    cartDrawer.setAttribute("role", "dialog");
+    cartDrawer.setAttribute("aria-modal", "true");
+    if (!wasOpen) {
+      cartLayer.hidden = true;
+      if (cartDrawer.contains(document.activeElement)) cartToggles[0]?.focus();
+    }
+  }
+};
+desktopCartMedia.addEventListener("change", syncCartLayout);
+syncCartLayout();
 
 cartToggles.forEach((button) => button.addEventListener("click", openCart));
 
@@ -246,7 +326,7 @@ document.querySelectorAll("[data-cart-close]").forEach((button) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (!cartLayer || cartLayer.hidden) return;
+  if (!cartLayer || cartLayer.hidden || hasDesktopCart() || !productModal.hidden) return;
 
   if (event.key === "Escape") {
     event.preventDefault();
@@ -254,19 +334,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key !== "Tab" || !cartDrawer) return;
-  const focusable = [...cartDrawer.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')];
-  if (focusable.length === 0) return;
-  const first = focusable[0];
-  const last = focusable.at(-1);
-
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
+  if (cartDrawer) trapFocus(event, cartDrawer);
 });
 
 const normalizePublicProduct = (product) => {
@@ -316,34 +384,101 @@ const normalizePublicProduct = (product) => {
 const formatPlain = (amount) => new Intl.NumberFormat("uz-UZ").format(amount);
 
 const priceMarkup = (product, className) =>
-  product.discountPercent > 0
-    ? `<span class="${className} is-discounted">${formatPlain(product.finalPrice)} <small>SO‘M</small><s>${formatPlain(product.price)}</s><b>−${product.discountPercent}%</b></span>`
-    : `<span class="${className}">${formatPlain(product.price)} <small>SO‘M</small></span>`;
+  product.discountPercent > 0 && product.finalPrice < product.price
+    ? `<span class="${className} is-discounted">${formatPlain(product.finalPrice)} <small>so‘m</small><s>${formatMoney(product.price)}</s></span>`
+    : `<span class="${className}">${formatPlain(product.finalPrice)} <small>so‘m</small></span>`;
+
+let allProducts = [];
+let selectedCategory = "";
+let catalogFailed = false;
+const searchInput = document.querySelector("#catalog-search");
+const sizeFilter = document.querySelector("#size-filter");
+const sortSelect = document.querySelector("#catalog-sort");
+const categoryChips = document.querySelector("#category-chips");
+const normalizeSearch = (value) => String(value).toLocaleLowerCase("uz").normalize("NFKC").replace(/[‘’ʻʼ`']/g, "");
+
+const productCard = (product) => `
+  <article class="catalog-card">
+    <button class="catalog-card-trigger" type="button" data-open-product="${escapeHtml(product.id)}" aria-label="${escapeHtml(product.name)} — rasmlar va tafsilotlar">
+      <span class="catalog-card-image"><img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" width="720" height="720" loading="lazy" decoding="async" />${product.discountPercent > 0 && product.finalPrice < product.price ? `<span class="catalog-discount">−${product.discountPercent}%</span>` : ""}</span>
+    </button>
+    <div class="catalog-card-body">
+      <p class="catalog-card-brand"><span>${escapeHtml(product.brand)}</span><span>${escapeHtml(product.category)}</span></p>
+      <h3 class="catalog-card-name">${escapeHtml(product.name)}</h3>
+      ${priceMarkup(product, "catalog-card-price")}
+      <div class="catalog-card-variants"><span>${escapeHtml(product.sizes.slice(0, 3).join(" · "))}${product.sizes.length > 3 ? ` · +${product.sizes.length - 3}` : ""}</span><span class="card-colors" aria-label="${escapeHtml(product.colors.map((color) => color.label).join(", "))}">${product.colors.slice(0, 3).map((color) => `<span class="card-color" style="background:${escapeHtml(color.hex)}" title="${escapeHtml(color.label)}"></span>`).join("")}${product.colors.length > 3 ? `+${product.colors.length - 3}` : ""}</span></div>
+      <button class="catalog-card-action" type="button" data-open-product="${escapeHtml(product.id)}" aria-label="${escapeHtml(product.name)} — rang va o‘lchamni tanlash">Tanlash ${icon("plus")}</button>
+    </div>
+  </article>`;
+
+const renderEmptyCatalog = (hasFilters) => {
+  if (!catalogEmpty) return;
+  catalogEmpty.innerHTML = `${icon(catalogFailed ? "rotate-ccw" : "package-open")}<h3>${catalogFailed ? "Mahsulotlar yuklanmadi" : hasFilters ? "Mos mahsulot topilmadi" : "Yangi modellar tez orada"}</h3><p>${catalogFailed ? "Ulanishni tekshirib, yana urinib ko‘ring." : hasFilters ? "Boshqa nom yoki o‘lcham bilan qidirib ko‘ring." : "Kolleksiyamiz yangilanmoqda. Yangiliklarni Instagram sahifamizda kuzating."}</p>${catalogFailed ? '<button class="text-button" type="button" data-catalog-retry>Qayta urinish</button>' : hasFilters ? '<button class="text-button" type="button" data-reset-filters>Filtrlarni tozalash</button>' : '<a class="text-button" href="https://www.instagram.com/neosport_namangan/" target="_blank" rel="noopener noreferrer">Instagramda ko‘rish</a>'}`;
+};
 
 const renderCatalog = (products) => {
   if (!catalogGrid) return;
   if (catalogEmpty) catalogEmpty.hidden = products.length > 0;
-  catalogGrid.innerHTML = products
-    .map(
-      (product) => `
-        <article class="catalog-card">
-          <button class="catalog-card-trigger" type="button" data-open-product="${escapeHtml(product.id)}" aria-label="${escapeHtml(product.name)} — rang va o‘lchamni tanlash">
-            <span class="catalog-card-image">
-              <img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" width="720" height="900" loading="lazy" decoding="async" />
-              <span class="catalog-card-category">${escapeHtml(product.category)}</span>
-              <span class="catalog-card-view" aria-hidden="true">Tanlash</span>
-            </span>
-            <span class="catalog-card-body">
-              <span class="catalog-card-brand">${escapeHtml(product.brand)}</span>
-              <span class="catalog-card-name">${escapeHtml(product.name)}</span>
-              <span class="catalog-card-description">${escapeHtml(product.description)}</span>
-              ${priceMarkup(product, "catalog-card-price")}
-            </span>
-          </button>
-        </article>`,
-    )
-    .join("");
+  catalogGrid.innerHTML = (isShopPage ? products : products.slice(0, 4)).map(productCard).join("");
+  catalogGrid.setAttribute("aria-busy", "false");
 };
+
+const applyFilters = () => {
+  const query = normalizeSearch(searchInput?.value.trim() || "");
+  const size = sizeFilter?.value || "";
+  let products = allProducts.filter((product) => (!selectedCategory || product.category === selectedCategory) && (!size || product.sizes.includes(size)) && (!query || normalizeSearch(`${product.name} ${product.brand}`).includes(query)));
+  if (sortSelect?.value === "price-asc") products.sort((a, b) => a.finalPrice - b.finalPrice);
+  if (sortSelect?.value === "price-desc") products.sort((a, b) => b.finalPrice - a.finalPrice);
+  if (sortSelect?.value === "name") products.sort((a, b) => a.name.localeCompare(b.name, "uz", { numeric: true }));
+  renderCatalog(products);
+  const count = document.querySelector("#catalog-count");
+  if (count) count.textContent = catalogFailed ? "Yuklashda xatolik" : `${products.length} ta mahsulot`;
+  const hasFilters = Boolean(query || size || selectedCategory);
+  const activeFilters = document.querySelector("#active-filters");
+  if (activeFilters) {
+    activeFilters.hidden = !hasFilters;
+    document.querySelector("#active-filter-label").textContent = [selectedCategory, size && `O‘lcham: ${size}`, query && `Qidiruv: ${searchInput.value.trim()}`].filter(Boolean).join(" · ");
+  }
+  const clearSearch = document.querySelector("#search-clear");
+  if (clearSearch) clearSearch.hidden = !query;
+  categoryChips?.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.category === selectedCategory)));
+  renderEmptyCatalog(hasFilters);
+};
+
+const renderFilters = () => {
+  if (!categoryChips || !sizeFilter) return;
+  const categories = [...new Set(allProducts.map((product) => product.category))];
+  categoryChips.innerHTML = ["", ...categories].map((category) => `<button class="category-chip" type="button" data-category="${escapeHtml(category)}" aria-pressed="${category === selectedCategory}">${category ? escapeHtml(category) : `${icon("layout-grid")} Barchasi`}<b>${category ? allProducts.filter((product) => product.category === category).length : allProducts.length}</b></button>`).join("");
+  const sizes = [...new Set(allProducts.flatMap((product) => product.sizes))];
+  const clothingOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
+  sizes.sort((a, b) => clothingOrder.includes(a) && clothingOrder.includes(b) ? clothingOrder.indexOf(a) - clothingOrder.indexOf(b) : a.localeCompare(b, "uz", { numeric: true }));
+  sizeFilter.innerHTML = '<option value="">Barcha o‘lchamlar</option>' + sizes.map((size) => `<option value="${escapeHtml(size)}">${escapeHtml(size)}</option>`).join("");
+  document.querySelector("#sidebar-count").textContent = String(allProducts.length);
+};
+
+const resetFilters = () => {
+  selectedCategory = "";
+  if (searchInput) searchInput.value = "";
+  if (sizeFilter) sizeFilter.value = "";
+  if (sortSelect) sortSelect.value = "default";
+  applyFilters();
+  searchInput?.focus();
+};
+searchInput?.addEventListener("input", applyFilters);
+sizeFilter?.addEventListener("change", applyFilters);
+sortSelect?.addEventListener("change", applyFilters);
+categoryChips?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category]");
+  if (!button) return;
+  selectedCategory = button.dataset.category;
+  applyFilters();
+});
+document.querySelector("#reset-filters")?.addEventListener("click", resetFilters);
+document.querySelector("#search-clear")?.addEventListener("click", () => { searchInput.value = ""; applyFilters(); searchInput.focus(); });
+catalogEmpty?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-reset-filters]")) resetFilters();
+  if (event.target.closest("[data-catalog-retry]")) loadProducts();
+});
 
 const buildProductModal = (product) => {
   const colorOptions = product.colors
@@ -367,14 +502,13 @@ const buildProductModal = (product) => {
   return `
     <article class="pdp">
       <div class="pdp-media">
-        <span class="pdp-badge">${escapeHtml(product.category)}</span>
         <img id="modal-product-image" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" width="900" height="1120" decoding="async" />
         ${
           product.images.length > 1
             ? `<div class="pdp-thumbs" role="group" aria-label="Mahsulot rasmlari">${product.images
                 .map(
                   (image, index) => `
-            <button class="pdp-thumb${index === 0 ? " is-active" : ""}" type="button" data-thumb="${escapeHtml(image)}" aria-label="${index + 1}-rasmni ko‘rish">
+            <button class="pdp-thumb${index === 0 ? " is-active" : ""}" type="button" data-thumb="${escapeHtml(image)}" aria-pressed="${index === 0}" aria-label="${index + 1}-rasmni ko‘rish">
               <img src="${escapeHtml(image)}" alt="" width="160" height="200" loading="lazy" decoding="async" />
             </button>`,
                 )
@@ -386,35 +520,33 @@ const buildProductModal = (product) => {
         <p class="pdp-brand">${escapeHtml(product.brand.toUpperCase())} · ${escapeHtml(product.category.toUpperCase())}</p>
         <h3 class="pdp-name" id="modal-product-name">${escapeHtml(product.name)}</h3>
         <div class="pdp-price">${
-          product.discountPercent > 0
+          product.discountPercent > 0 && product.finalPrice < product.price
             ? `${formatPlain(product.finalPrice)} <small>so‘m</small><s>${formatPlain(product.price)}</s><b>−${product.discountPercent}%</b>`
             : `${formatPlain(product.price)} <small>so‘m</small>`
         }</div>
-        <div class="pdp-stock"><i aria-hidden="true"></i> Sotuvda mavjud</div>
+        <div class="pdp-stock">${icon("check")} Sotuvda mavjud</div>
         ${product.description ? `<p class="pdp-desc">${escapeHtml(product.description)}</p>` : ""}
-        <form class="product-order-form pdp-form" id="modal-product-form" data-product-id="${escapeHtml(product.id)}">
+        <form class="product-order-form pdp-form" id="modal-product-form" data-product-id="${escapeHtml(product.id)}" novalidate>
           <fieldset class="product-option-group color-options">
-            <legend>RANG <span id="modal-selected-color">${escapeHtml((firstColor?.label || "").toUpperCase())}</span></legend>
+            <legend>Rang <span id="modal-selected-color">${escapeHtml(firstColor?.label || "")}</span></legend>
             <div class="option-row">${colorOptions}</div>
           </fieldset>
           <fieldset class="product-option-group size-options">
-            <legend>O‘LCHAM <span>BITTASINI TANLANG</span></legend>
+            <legend>O‘lcham <span>Tanlang</span></legend>
             <div class="option-row">${sizeOptions}</div>
           </fieldset>
           <div class="pdp-buy">
-            <div class="quantity-picker" aria-label="Mahsulot soni">
-              <button type="button" data-quantity-action="decrease" aria-label="Soni kamaytirish">−</button>
+            <div class="quantity-picker" role="group" aria-label="Mahsulot soni">
+              <button type="button" data-quantity-action="decrease" aria-label="Soni kamaytirish" title="Kamaytirish" disabled>${icon("minus")}</button>
               <output id="modal-product-quantity" aria-live="polite">1</output>
-              <button type="button" data-quantity-action="increase" aria-label="Soni oshirish">+</button>
+              <button type="button" data-quantity-action="increase" aria-label="Soni oshirish" title="Oshirish">${icon("plus")}</button>
             </div>
-            <button class="shop-add-button" type="submit">Savatchaga qo‘shish</button>
+            <button class="shop-add-button" type="submit" aria-disabled="true" aria-describedby="modal-form-status">Savatchaga qo‘shish</button>
           </div>
-          <p class="product-form-status" id="modal-form-status" role="status" aria-live="polite"></p>
+          <p class="product-form-status" id="modal-form-status" role="status" aria-live="polite">O‘lchamni tanlang.</p>
         </form>
         <ul class="pdp-perks">
-          <li><b>↗</b> Buyurtma Telegram bot orqali xavfsiz qabul qilinadi</li>
-          <li><b>◇</b> Rang va o‘lcham — o‘zingizga mos variantni tanlang</li>
-          <li><b>◎</b> Namangan bo‘ylab yetkazib berish</li>
+          <li>${icon("map-pin")} Namangandagi do‘konimizda kiyib ko‘ring.</li>
         </ul>
       </div>
     </article>`;
@@ -432,6 +564,7 @@ const openProductModal = (productId) => {
   lastModalFocus = document.activeElement;
   productModal.hidden = false;
   document.body.classList.add("cart-open");
+  isolateSurface(productModal);
   window.requestAnimationFrame(() => productModal.classList.add("is-open"));
   productModal.querySelector(".product-modal-close")?.focus();
 };
@@ -439,7 +572,8 @@ const openProductModal = (productId) => {
 const closeProductModal = (restoreFocus = true) => {
   if (!productModal || productModal.hidden) return;
   productModal.classList.remove("is-open");
-  if (!document.querySelector(".cart-layer:not([hidden])")) document.body.classList.remove("cart-open");
+  document.body.classList.remove("cart-open");
+  isolateSurface(null);
 
   const finish = () => {
     productModal.hidden = true;
@@ -449,7 +583,7 @@ const closeProductModal = (restoreFocus = true) => {
   };
 
   if (reduceMotion) finish();
-  else closeModalTimer = window.setTimeout(finish, 280);
+  else closeModalTimer = window.setTimeout(finish, 180);
 };
 
 catalogGrid?.addEventListener("click", (event) => {
@@ -468,14 +602,18 @@ productModal?.addEventListener("click", (event) => {
 
   const image = productModal.querySelector("#modal-product-image");
   if (image) image.src = thumb.dataset.thumb;
-  productModal.querySelectorAll(".pdp-thumb").forEach((button) => button.classList.toggle("is-active", button === thumb));
+  productModal.querySelectorAll(".pdp-thumb").forEach((button) => { button.classList.toggle("is-active", button === thumb); button.setAttribute("aria-pressed", String(button === thumb)); });
 });
 
 productModal?.addEventListener("change", (event) => {
   const input = event.target;
+  if (input.name === "size" && input.checked) {
+    productModal.querySelector(".shop-add-button").setAttribute("aria-disabled", "false");
+    productModal.querySelector("#modal-form-status").textContent = `Tanlangan o‘lcham: ${input.value}`;
+  }
   if (input.name !== "color" || !input.checked) return;
   const label = productModal.querySelector("#modal-selected-color");
-  if (label) label.textContent = String(input.dataset.label || "").toUpperCase();
+  if (label) label.textContent = String(input.dataset.label || "");
 
   const image = productModal.querySelector("#modal-product-image");
   if (image && input.dataset.image) {
@@ -493,6 +631,8 @@ productModal?.addEventListener("click", (event) => {
   modalQuantity = Math.max(1, Math.min(10, modalQuantity + delta));
   const output = productModal.querySelector("#modal-product-quantity");
   if (output) output.textContent = String(modalQuantity);
+  productModal.querySelector('[data-quantity-action="decrease"]').disabled = modalQuantity === 1;
+  productModal.querySelector('[data-quantity-action="increase"]').disabled = modalQuantity === 10;
 });
 
 productModal?.addEventListener("submit", (event) => {
@@ -532,7 +672,11 @@ productModal?.addEventListener("submit", (event) => {
   productModal.hidden = true;
   productModalBody.innerHTML = "";
   modalProductId = null;
+  isolateSurface(null);
+  document.body.classList.remove("cart-open");
+  lastModalFocus?.focus();
   openCart();
+  if (hasDesktopCart()) announce("Mahsulot savatchaga qo‘shildi.");
 });
 
 document.addEventListener("keydown", (event) => {
@@ -544,20 +688,8 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key !== "Tab") return;
   const dialog = productModal.querySelector(".product-modal-dialog");
-  const focusable = [...(dialog?.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])') || [])];
-  if (focusable.length === 0) return;
-  const first = focusable[0];
-  const last = focusable.at(-1);
-
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
+  if (dialog) trapFocus(event, dialog);
 });
 
 /* ------------------------------------------------------------ the account -- */
@@ -609,9 +741,9 @@ const renderAccount = ({ user, googleEnabled, telegramEnabled }) => {
   }
 
   accountSlot.innerHTML = [
-    googleEnabled ? `<a class="account-signin" href="/api/auth/login?next=${next}">${GOOGLE_MARK}<span>Kirish</span></a>` : "",
+    googleEnabled ? `<a class="account-signin" href="/api/auth/login?next=${next}" aria-label="Google orqali kirish" title="Google orqali kirish">${GOOGLE_MARK}<span>Kirish</span></a>` : "",
     telegramEnabled
-      ? `<a class="account-signin" data-telegram-signin href="/api/auth/telegram/start?next=${next}">${TELEGRAM_MARK}<span>Telegram</span></a>`
+      ? `<a class="account-signin" data-telegram-signin href="/api/auth/telegram/start?next=${next}" aria-label="Telegram orqali kirish" title="Telegram orqali kirish">${TELEGRAM_MARK}<span>Telegram</span></a>`
       : "",
   ].join("");
 };
@@ -762,10 +894,20 @@ const authNotice = new URLSearchParams(window.location.search).get("auth");
 if (authNotice && checkoutStatus) {
   checkoutStatus.textContent =
     authNotice === "bekor" ? "Kirish bekor qilindi." : "Kirishda xatolik yuz berdi. Qayta urinib ko‘ring.";
+  announce(checkoutStatus.textContent);
 }
 
+let cartHydrated = false;
 const loadProducts = async () => {
   const loadedProducts = [];
+  catalogFailed = false;
+  const catalogCount = document.querySelector("#catalog-count");
+  if (catalogCount) catalogCount.textContent = "Yuklanmoqda...";
+  if (catalogEmpty) catalogEmpty.hidden = true;
+  if (catalogGrid) {
+    catalogGrid.setAttribute("aria-busy", "true");
+    catalogGrid.innerHTML = Array.from({ length: isShopPage ? 3 : 4 }, () => '<div class="catalog-skeleton" aria-hidden="true"><div></div><span></span><span></span></div>').join("");
+  }
   try {
     const response = await fetch("/api/products", { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("Mahsulotlarni yuklab bo‘lmadi.");
@@ -789,13 +931,18 @@ const loadProducts = async () => {
         ),
       };
     }
-    renderCatalog(loadedProducts);
+    allProducts = loadedProducts;
+    renderFilters();
+    applyFilters();
+    cart = sanitizeCart(cartHydrated ? cart : storedCart);
+    cartHydrated = true;
+    saveCart();
   } catch (error) {
     console.warn(error.message);
-    renderCatalog([]);
+    catalogFailed = true;
+    allProducts = [];
+    applyFilters();
   } finally {
-    cart = sanitizeCart([...storedCart, ...cart]);
-    saveCart();
     renderCart();
   }
 };
@@ -817,6 +964,9 @@ cartItemsElement?.addEventListener("click", (event) => {
 
   saveCart();
   renderCart();
+  const remainingItem = [...cartItemsElement.querySelectorAll("[data-cart-key]")].find((element) => element.dataset.cartKey === itemElement.dataset.cartKey);
+  const nextFocus = remainingItem?.querySelector(`[data-cart-action="${button.dataset.cartAction}"]:not([disabled])`) || remainingItem?.querySelector("button:not([disabled])") || cartItemsElement.querySelector("button:not([disabled])") || (hasDesktopCart() ? searchInput : cartDrawer.querySelector(".cart-close"));
+  nextFocus?.focus();
 });
 
 checkoutForm?.querySelectorAll("input").forEach((input) => {
@@ -893,6 +1043,14 @@ checkoutForm?.addEventListener("submit", async (event) => {
 
 if (catalogGrid || cartItemsElement) loadProducts();
 loadAccount();
+
+document.addEventListener("error", (event) => {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement) || !image.closest(".catalog-card, .pdp, .cart-item") || image.dataset.fallback) return;
+  image.dataset.fallback = "true";
+  image.src = "assets/neosport-mark.webp";
+  image.alt = "Mahsulot rasmi hozircha yuklanmadi";
+}, true);
 
 const year = document.querySelector("#year");
 if (year) year.textContent = new Date().getFullYear();

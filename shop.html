@@ -2,169 +2,77 @@
 <html lang="uz">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#090a08" />
-    <meta
-      name="description"
-      content="NeoSport onlayn do‘koni — sport kiyimlari rangini va o‘lchamini tanlang, savatchaga qo‘shing va buyurtmani Telegram orqali yuboring."
-    />
+    <meta name="description" content="NeoSport onlayn do‘koni. Sport va kundalik kiyimlar: rang va o‘lchamni tanlang, onlayn buyurtma bering." />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="uz_UZ" />
     <meta property="og:site_name" content="NeoSport" />
     <meta property="og:title" content="NeoSport onlayn do‘koni" />
-    <meta property="og:description" content="Rang va o‘lchamni tanlab, NeoSport’dan onlayn buyurtma bering." />
+    <meta property="og:description" content="Sport va kundalik uslub uchun kiyimlar." />
     <meta property="og:image" content="/assets/neosport-hero.png" />
     <title>NeoSport onlayn do‘koni — Kiyimlarni tanlang</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/png" href="assets/neosport-mark.png" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="shop.css" />
   </head>
   <body class="shop-page">
     <a class="skip-link" href="#shop">Katalogga o‘tish</a>
-
-    <div class="topline">
-      <p>NEOSPORT · ONLAYN DO‘KON</p>
-      <a href="/">Bosh sahifaga qaytish</a>
-    </div>
-
     <header class="site-header" id="site-header">
-      <a class="brand" href="/" aria-label="NeoSport bosh sahifasi">
-        <picture>
-          <source srcset="assets/neosport-mark.webp" type="image/webp" />
-          <img src="assets/neosport-mark.png" alt="" width="480" height="540" />
-        </picture>
-        <span>NEO<span>SPORT</span></span>
-      </a>
-
-      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menyuni ochish">
-        <span aria-hidden="true"></span><span aria-hidden="true"></span>
-        <span class="sr-only">Menyuni ochish</span>
-      </button>
-
-      <nav class="site-nav" id="site-nav" aria-label="Asosiy navigatsiya">
-        <a href="/">Bosh sahifa</a>
-        <a href="#shop" class="active">Katalog</a>
-        <a href="/#collection">Kolleksiya</a>
-        <a href="/#about">Biz haqimizda</a>
-        <a href="/#store">Manzil</a>
-      </nav>
-
+      <div class="shop-brand-group">
+        <button class="menu-toggle icon-button" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menyuni ochish" title="Menyu"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#menu" /></svg></button>
+        <a class="brand" href="/" aria-label="NeoSport bosh sahifasi">
+          <picture><source srcset="assets/neosport-mark.webp" type="image/webp" /><img src="assets/neosport-mark.png" alt="" width="480" height="540" /></picture>
+          <span>NEO<span>SPORT</span></span>
+        </a>
+      </div>
+      <p class="header-caption">Sport va kundalik uslub</p>
       <div class="header-actions">
         <div class="account" id="account" data-next="/shop" hidden></div>
-        <button class="cart-toggle" type="button" aria-controls="cart-drawer" aria-label="Savatchani ochish, 0 ta mahsulot">
-          <span>Savatcha</span><b class="cart-count" aria-hidden="true">0</b>
-        </button>
-        <a class="header-cta" href="/">Bosh sahifa</a>
+        <button class="cart-toggle" type="button" aria-controls="cart-drawer" aria-label="Savatchani ochish, 0 ta mahsulot"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#shopping-bag" /></svg><span>Savatcha</span><b class="cart-count" aria-hidden="true">0</b></button>
       </div>
     </header>
-
-    <main id="main">
-      <h1 class="sr-only" id="shop-hero-title">Onlayn do‘kon</h1>
-
-      <section class="shop-page-catalog" id="shop" aria-labelledby="catalog-title">
-        <div class="catalog" id="catalog-more">
-          <div class="catalog-head">
-            <h2 id="catalog-title">Katalogdagi mahsulotlar</h2>
-            <p>Har bir mahsulot uchun rang va o‘lchamni alohida tanlang.</p>
-          </div>
-          <div class="catalog-grid" id="catalog-grid" aria-live="polite"></div>
-          <div class="catalog-empty" id="catalog-empty">
-            <span aria-hidden="true">N</span>
-            <h3>HOZIRCHA MAHSULOT YO‘Q</h3>
-            <p>Katalog admin panel orqali to‘ldiriladi. Yangi mahsulotlar shu yerda paydo bo‘ladi.</p>
-            <a
-              href="https://www.instagram.com/neosport_namangan/"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-analytics-location="product"
-              data-analytics-destination="instagram"
-              >Instagramda ko‘rish</a
-            >
-          </div>
+    <div class="shop-layout">
+      <button class="menu-backdrop" type="button" data-menu-close aria-label="Menyuni yopish" hidden></button>
+      <aside class="shop-sidebar" id="site-nav" aria-label="Do‘kon navigatsiyasi">
+        <div class="sidebar-mobile-head"><strong>Menyu</strong><button class="icon-button" type="button" data-menu-close aria-label="Menyuni yopish" title="Yopish"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#x" /></svg></button></div>
+        <p class="sidebar-label">DO‘KON</p>
+        <nav class="sidebar-nav" aria-label="Asosiy navigatsiya">
+          <a class="active" href="#shop" aria-current="page"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#layout-grid" /></svg>Katalog <span class="sidebar-count" id="sidebar-count">0</span></a>
+          <a href="/"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#house" /></svg>Bosh sahifa</a>
+          <a href="/#store"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#map-pin" /></svg>Do‘kon manzili</a>
+        </nav>
+        <div class="sidebar-filters" id="sidebar-filters"><label class="sidebar-label" for="size-filter">O‘LCHAM</label><select id="size-filter"><option value="">Barcha o‘lchamlar</option></select></div>
+        <div class="sidebar-bottom">
+          <p class="sidebar-label">BIZ BILAN BOG‘LANING</p>
+          <a class="sidebar-contact" href="https://www.instagram.com/neosport_namangan/" target="_blank" rel="noopener noreferrer" data-analytics-location="footer" data-analytics-destination="instagram"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#instagram" /></svg><span>Instagram<small>@neosport_namangan</small></span><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-up-right" /></svg></a>
+          <div class="sidebar-location"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#map-pin" /></svg><span>Namangan, O‘zbekiston</span></div>
         </div>
-
-        <section class="account-orders" id="account-orders" aria-labelledby="account-orders-title" hidden>
-          <div class="catalog-head">
-            <h2 id="account-orders-title">Buyurtmalarim</h2>
-            <p>Google hisobingiz bilan berilgan buyurtmalar.</p>
-          </div>
-          <div id="account-orders-body" aria-live="polite"></div>
-        </section>
-
-        <div class="shop-steps" aria-label="Buyurtma berish bosqichlari">
-          <div><b>01</b><span>Rang va o‘lchamni tanlang</span></div>
-          <div><b>02</b><span>Savatchani tekshiring</span></div>
-          <div><b>03</b><span>Ism va telefonni yuboring</span></div>
-        </div>
-      </section>
-    </main>
-
-    <div class="product-modal" id="product-modal" hidden>
-      <button class="product-modal-backdrop" type="button" data-modal-close aria-label="Oynani yopish"></button>
-      <div class="product-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-product-name">
-        <button class="product-modal-close" type="button" data-modal-close aria-label="Oynani yopish">×</button>
-        <div class="product-modal-body" id="product-modal-body"></div>
-      </div>
-    </div>
-
-    <div class="cart-layer" id="cart-layer" hidden>
-      <button class="cart-backdrop" type="button" data-cart-close aria-label="Savatchani yopish"></button>
-      <aside class="cart-drawer" id="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title">
-        <header class="cart-header">
-          <div><p>SIZNING TANLOVINGIZ</p><h2 id="cart-title">SAVATCHA <span class="cart-count">0</span></h2></div>
-          <button class="cart-close" type="button" data-cart-close aria-label="Savatchani yopish">×</button>
-        </header>
-        <div class="cart-content">
-          <div class="cart-empty" id="cart-empty">
-            <span aria-hidden="true">N</span><h3>SAVATCHA BO‘SH</h3>
-            <p>Mahsulotning rang va o‘lchamini tanlab, savatchaga qo‘shing.</p>
-            <button type="button" data-cart-close data-scroll-to-shop>Do‘konga qaytish</button>
-          </div>
-          <div class="cart-items" id="cart-items" aria-live="polite"></div>
-        </div>
-        <footer class="cart-footer">
-          <div class="cart-total"><span>JAMI</span><strong id="cart-total">0 SO‘M</strong></div>
-          <form class="checkout-form" id="checkout-form" novalidate>
-            <div class="checkout-fields">
-              <label><span>ISMINGIZ</span><input type="text" name="name" autocomplete="name" minlength="2" maxlength="60" placeholder="Masalan, Azizbek" required /></label>
-              <label><span>TELEFON RAQAMINGIZ</span><input type="tel" name="phone" autocomplete="tel" inputmode="tel" minlength="9" maxlength="24" placeholder="+998 90 123 45 67" required /></label>
-            </div>
-            <label class="checkout-honeypot" aria-hidden="true">Sayt<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
-            <button class="checkout-button" id="checkout-button" type="submit" disabled><span>Buyurtmani yuborish</span></button>
-            <p class="checkout-note">Buyurtma NeoSport operatoriga Telegram bot orqali xavfsiz yuboriladi.</p>
-            <p class="checkout-status" id="checkout-status" role="status" aria-live="polite"></p>
-          </form>
-        </footer>
       </aside>
+      <main id="main">
+        <section class="shop-page-catalog" id="shop" aria-labelledby="catalog-title">
+          <div class="catalog" id="catalog-more">
+            <div class="catalog-heading"><div><p class="eyebrow">NEOSPORT / ONLAYN DO‘KON</p><h1 id="catalog-title">KATALOG</h1></div><p class="catalog-count" id="catalog-count" role="status">Yuklanmoqda...</p></div>
+            <div class="catalog-toolbar">
+              <div class="catalog-search"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#search" /></svg><label class="sr-only" for="catalog-search">Mahsulot yoki brendni qidirish</label><input id="catalog-search" type="search" placeholder="Mahsulot yoki brendni qidirish" autocomplete="off" /><button class="icon-button" id="search-clear" type="button" aria-label="Qidiruvni tozalash" title="Tozalash" hidden><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#x" /></svg></button></div>
+              <label class="sort-control"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#arrow-down-up" /></svg><span class="sr-only">Saralash</span><select id="catalog-sort"><option value="default">Odatiy tartib</option><option value="price-asc">Narx: arzonroq</option><option value="price-desc">Narx: qimmatroq</option><option value="name">Nom: A–Z</option></select></label>
+            </div>
+            <div class="category-chips" id="category-chips" role="group" aria-label="Mahsulot kategoriyalari"></div>
+            <div class="active-filters" id="active-filters" hidden><span id="active-filter-label"></span><button class="text-button" id="reset-filters" type="button"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#x" /></svg>Tozalash</button></div>
+            <div class="catalog-grid" id="catalog-grid" aria-busy="true"></div>
+            <div class="catalog-empty" id="catalog-empty" hidden></div>
+          </div>
+          <section class="account-orders" id="account-orders" aria-labelledby="account-orders-title" hidden><div class="catalog-head"><h2 id="account-orders-title">Buyurtmalarim</h2><p>Hisobingiz orqali berilgan buyurtmalar.</p></div><div id="account-orders-body" aria-live="polite"></div></section>
+        </section>
+      </main>
+      <div id="desktop-cart-slot"></div>
     </div>
-
-    <nav class="mobile-actions" aria-label="Tezkor amallar">
-      <a href="#shop">Katalog</a>
-      <button class="cart-toggle" type="button" aria-controls="cart-drawer" aria-label="Savatchani ochish, 0 ta mahsulot">
-        <span>Savatcha</span><b class="cart-count" aria-hidden="true">0</b>
-      </button>
-    </nav>
-
-    <footer class="site-footer">
-      <a class="brand footer-brand" href="/" aria-label="NeoSport bosh sahifasi">
-        <picture><source srcset="assets/neosport-mark.webp" type="image/webp" /><img src="assets/neosport-mark.png" alt="" width="480" height="540" loading="lazy" decoding="async" /></picture>
-        <span>NEO<span>SPORT</span></span>
-      </a>
-      <p>ONLAYN DO‘KON · NAMANGAN</p>
-      <div class="footer-links">
-        <a href="/">Bosh sahifa</a>
-        <a href="https://www.instagram.com/neosport_namangan/" target="_blank" rel="noopener noreferrer" data-analytics-location="footer" data-analytics-destination="instagram">Instagram ↗</a>
-      </div>
-      <small>© <span id="year"></span> NeoSport</small>
-    </footer>
-
+    <footer class="site-footer"><p>NEOSPORT · NAMANGAN</p><div class="footer-links"></div><small>© <span id="year"></span> NeoSport</small></footer>
     <script defer src="/_vercel/insights/script.js"></script>
+    <script src="storefront-ui.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

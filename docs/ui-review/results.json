@@ -1,0 +1,36 @@
+[
+  {
+    "width": 360,
+    "status": "passed",
+    "realProducts": 2,
+    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+  },
+  {
+    "width": 390,
+    "status": "passed",
+    "realProducts": 2,
+    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+  },
+  {
+    "width": 768,
+    "status": "passed",
+    "realProducts": 2,
+    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+  },
+  {
+    "width": 1024,
+    "status": "passed",
+    "realProducts": 2,
+    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+  },
+  {
+    "width": 1440,
+    "status": "passed",
+    "realProducts": 2,
+    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+  },
+  {
+    "status": "passed",
+    "checks": "catalog loading, error, retry, empty, saved cart retained after fetch failure, long cart, responsive cart transitions, short viewport input focus, 320px single column, isolated nine-product grid"
+  }
+]

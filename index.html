@@ -2,7 +2,7 @@
 <html lang="uz">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#090a08" />
     <meta
       name="description"
@@ -39,6 +39,7 @@
     <link rel="icon" type="image/png" href="assets/neosport-mark.png" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="landing.css" />
+    <link rel="stylesheet" href="shop.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -90,11 +91,12 @@
         aria-controls="site-nav"
         aria-label="Menyuni ochish"
       >
-        <span aria-hidden="true"></span><span aria-hidden="true"></span>
+        <svg class="icon" aria-hidden="true"><use href="assets/icons.svg#menu" /></svg>
         <span class="sr-only">Menyuni ochish</span>
       </button>
 
       <nav class="site-nav" id="site-nav" aria-label="Asosiy navigatsiya">
+        <button class="landing-menu-close icon-button" type="button" data-menu-close aria-label="Menyuni yopish" title="Yopish"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#x" /></svg></button>
         <a href="#new">Yangi</a>
         <a href="#collection">Kolleksiya</a>
         <a href="#about">Biz haqimizda</a>
@@ -104,6 +106,7 @@
       <div class="header-actions">
         <div class="account" id="account" data-next="/" hidden></div>
         <a class="header-shop-link" href="/shop">Do‘kon</a>
+        <button class="cart-toggle" type="button" aria-controls="cart-drawer" aria-label="Savatchani ochish, 0 ta mahsulot" title="Savatcha"><svg class="icon" aria-hidden="true"><use href="assets/icons.svg#shopping-bag" /></svg><b class="cart-count" aria-hidden="true">0</b></button>
         <a
           class="header-cta"
           href="https://www.instagram.com/neosport_namangan/"
@@ -123,9 +126,11 @@
         <div class="hero-shade" aria-hidden="true"></div>
 
         <div class="hero-copy">
-          <h1 id="hero-title">HARAKAT SEN BILAN.</h1>
+          <p class="hero-eyebrow">NAMANGAN · SPORT VA KUNDALIK USLUB</p>
+          <h1 id="hero-title">NEO<span>SPORT</span></h1>
+          <h2 class="hero-tagline">HARAKAT SEN BILAN.</h2>
           <p>
-            Sport va kundalik uslub uchun yangi modellar. Rang va o‘lchamni tanlang, savatchaga qo‘shing va onlayn buyurtma bering.
+            Harakatga mos kiyim. O‘zingizga xos uslub. Sport va kundalik hayot uchun yangi modellar.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="/shop">Onlayn do‘kon</a>
@@ -137,10 +142,11 @@
       <section class="row" id="new" aria-labelledby="new-title">
         <div class="row-head">
           <h2 id="new-title">Yangi kelganlar</h2>
-          <p>Namangandagi do‘konda mavjud modellar. O‘lcham, narx va mavjudligini Instagramda so‘rang.</p>
+          <p>Sport va kundalik hayot uchun tanlov.</p>
         </div>
 
-        <div class="row-empty">
+        <div class="catalog-grid home-products" id="catalog-grid" aria-busy="true"></div>
+        <div class="row-empty" id="catalog-empty" hidden>
           <p>Katalog yangilanmoqda. Yangi kelgan modellar tez orada shu yerda paydo bo‘ladi.</p>
           <a
             class="button button-ghost"
@@ -334,6 +340,7 @@
     </footer>
 
     <script defer src="/_vercel/insights/script.js"></script>
+    <script src="storefront-ui.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

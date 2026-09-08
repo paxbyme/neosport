@@ -531,3 +531,88 @@
     transition: none;
   }
 }
+
+/* Storefront alignment: the original hero, content and destinations are retained. */
+.landing { --pad: 32px; }
+.landing .topline { min-height: 30px; font-size: 9px; }
+.landing .topline a { min-height: 44px; display: inline-flex; align-items: center; }
+.landing .hero { min-height: 520px; height: min(640px, 70svh); align-items: center; }
+.landing .hero-photo { background-position: center top; }
+.landing .hero-shade { background: linear-gradient(90deg, rgba(5, 7, 5, .86), rgba(5, 7, 5, .12) 65%); }
+.landing .hero-copy { width: 100%; max-width: 1600px; margin: auto; padding: 44px var(--pad); }
+.landing .hero .hero-eyebrow { color: var(--lime); margin: 0 0 20px; font-size: 10px; }
+.landing .hero h1 { font-size: 100px; line-height: .9; }
+.landing .hero h1 span { color: var(--lime); }
+.hero-tagline { margin: 18px 0 0; font: 700 32px/1.1 var(--display); }
+.landing .hero p { max-width: 38ch; font-size: 13px; }
+.landing .hero-actions { margin-top: 28px; }
+.landing .hero-actions .button { min-width: 160px; }
+.landing .row, .landing .creed, .landing .steps, .landing .social { max-width: 1600px; margin-inline: auto; padding: 64px var(--pad); }
+.landing .row + .row { padding-top: 12px; }
+.landing .row-head { text-align: left; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+.landing .row-head h2 { font-size: 32px; line-height: 1.1; }
+.landing .row-head p { margin: 0; font-size: 12px; }
+.landing .home-products { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.landing .row-more { justify-content: flex-start; margin-top: 24px; }
+.landing .row-more .button { min-width: 220px; }
+.landing .row-empty { border: 0; background: none; }
+.landing .tiles { gap: 18px; }
+.landing .tile { min-height: 180px; padding: 24px; border-radius: 8px; }
+.landing .tile h3 { font-size: 34px; line-height: 1.1; }
+.landing .tile p { line-height: 1.6; }
+.landing .creed h2 { font-size: 52px; line-height: 1.05; }
+.landing .creed-mark { background: none; padding: 32px; }
+.landing .creed-mark img { height: 240px; width: auto; object-fit: contain; }
+.landing .creed-tags li { border: 0; padding: 0 18px 0 0; font-size: 11px; color: var(--lime); }
+.landing .place { min-height: 380px; padding: 64px max(var(--pad), calc((100% - 1536px) / 2)); }
+.landing .place-card { padding: 0; border: 0; background: none; backdrop-filter: none; }
+.landing .place-card h2 { font-size: 42px; line-height: 1.1; }
+.landing .social-handle { font-size: 54px; line-height: 1.2; }
+.landing .site-footer { max-width: 1600px; margin: auto; padding: 32px var(--pad); }
+.landing-menu-close { display: none !important; }
+.landing .site-nav a { min-height: 44px; font-size: 11px; }
+@media (max-width: 1199px) {
+  .landing .home-products { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .landing .hero h1 { font-size: 84px; }
+}
+@media (max-width: 900px) {
+  .landing .landing-menu-close { display: grid !important; align-self: flex-end; }
+  .landing .creed-mark { order: 0; }
+  .landing .hero { min-height: 480px; }
+  .landing .hero h1 { font-size: 72px; }
+}
+@media (max-width: 767px) {
+  .landing { --pad: 16px; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .landing .topline { display: none; }
+  .landing .hero { min-height: 440px; height: min(600px, 70svh); align-items: flex-end; }
+  .landing .hero-photo { background-position: 63% center; }
+  .landing .hero-shade { background: linear-gradient(0deg, rgba(5, 7, 5, .92), rgba(5, 7, 5, .1) 90%); }
+  .landing .hero-copy { padding: 32px 16px; }
+  .landing .hero .hero-eyebrow { font-size: 9px; margin-bottom: 14px; }
+  .landing .hero h1 { font-size: 64px; }
+  .landing .hero-tagline { font-size: 27px; margin-top: 12px; }
+  .landing .hero p { font-size: 12px; line-height: 1.7; max-width: 35ch; }
+  .landing .hero-actions { gap: 8px; margin-top: 22px; flex-wrap: nowrap; }
+  .landing .hero-actions .button { flex: 1; min-width: 0; padding: 0 12px; }
+  .landing .row, .landing .creed, .landing .steps, .landing .social { padding: 40px 16px; }
+  .landing .row-head { display: block; margin-bottom: 20px; }
+  .landing .row-head h2 { font-size: 28px; }
+  .landing .row-head p { font-size: 11px; margin-top: 8px; }
+  .landing .home-products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .landing .row-more .button { width: 100%; }
+  .landing .tiles { grid-template-columns: 1fr; gap: 0; }
+  .landing .tile { min-height: 112px; padding: 24px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+  .landing .tile h3 { font-size: 28px; }
+  .landing .creed h2 { font-size: 36px; }
+  .landing .creed p { font-size: 13px; }
+  .landing .creed-mark { padding: 16px; aspect-ratio: auto; }
+  .landing .creed-mark img { height: 160px; }
+  .landing .place { min-height: 360px; padding: 40px 16px; }
+  .landing .place-card h2 { font-size: 32px; }
+  .landing .place-card .button { width: 100%; min-width: 0; }
+  .landing .social-handle { font-size: 30px; }
+  .landing .site-footer { padding: 28px 16px; }
+  .landing .mobile-actions a { min-height: 48px; border-radius: 8px; text-transform: none; justify-content: center; font-size: 12px; }
+  .landing .mobile-actions a + a { background: var(--ink-soft); color: var(--white); border: 1px solid var(--line); }
+}
+@media (max-width: 359px) { .landing .home-products { grid-template-columns: 1fr; } .landing .hero h1 { font-size: 56px; } }

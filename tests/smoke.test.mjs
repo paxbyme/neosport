@@ -35,6 +35,7 @@ const css = read("styles.css");
 const landingCss = read("landing.css");
 const shopCss = read("shop.css");
 const script = read("script.js");
+const storefrontUi = read("storefront-ui.js");
 const instagram = "https://www.instagram.com/neosport_namangan/";
 const maps = "https://yandex.uz/maps/-/CTgRbPmH";
 
@@ -114,11 +115,11 @@ test("numbering appears only on the ordered buying steps", () => {
 test("shop uses the same retail layout system as the landing page", () => {
   assert.match(shopHtml, /<link rel="stylesheet" href="shop\.css" \/>/);
 
-  // No page head at all: the catalog starts straight under the header and the
-  // only h1 left on the page is there for screen readers.
+  // The compact catalog heading is visible; both routes share shopping surfaces.
   assert.doesNotMatch(shopHtml, /shop-head|shop-page-hero|shop-page-glow|shop-page-tags/);
   assert.doesNotMatch(shopCss, /\.shop-head|\.shop-count/);
-  assert.match(shopHtml, /<h1 class="sr-only" id="shop-hero-title">/);
+  assert.match(shopHtml, /<h1 id="catalog-title">/);
+  for (const page of [html, shopHtml]) assert.match(page, /src="storefront-ui\.js"/);
 
   // Product detail is rendered into the modal: image column beside a sticky buy panel.
   assert.match(script, /<article class="pdp">/);
@@ -126,10 +127,10 @@ test("shop uses the same retail layout system as the landing page", () => {
   assert.match(script, /class="pdp-panel"/);
   assert.match(shopCss, /\.pdp-panel \{[^}]*position: sticky;/);
 
-  // Catalog tiles match the landing grid: flat, contained, no card chrome.
-  assert.match(shopCss, /\.catalog-card-image \{[^}]*background: var\(--tile\);/);
+  // Photography stays contained, with a stable square image area on both pages.
+  assert.match(shopCss, /\.catalog-card-image \{[^}]*aspect-ratio: 1;/);
   assert.match(shopCss, /\.catalog-card-image img \{[^}]*object-fit: contain;/);
-  assert.doesNotMatch(shopCss, /\.catalog-card[^{]*\{[^}]*border-radius/);
+  assert.match(shopCss, /\.catalog-card \{[^}]*border-radius: 12px;/);
 
   // No decorative arrows survive in the shop's own buttons or generated markup.
   for (const button of shopHtml.matchAll(/<(?:a|button) class="(?:button|shop-add-button|checkout-button)[^"]*"[^>]*>([\s\S]*?)<\/(?:a|button)>/g)) {
@@ -146,7 +147,7 @@ test("shop is a standalone page linked from the landing page", () => {
   assert.doesNotMatch(html, /id="shop"/);
   assert.doesNotMatch(html, /id="cart-drawer"/);
   assert.match(shopHtml, /<body class="shop-page">/);
-  assert.match(shopHtml, /id="shop-hero-title"/);
+  assert.match(shopHtml, /id="catalog-title"/);
   assert.match(shopHtml, /id="shop"/);
 });
 
@@ -264,14 +265,14 @@ test("no product is hardcoded into the site, the client, or the service", () => 
 
 test("online shop supports variants, a persistent cart, and customer checkout", () => {
   for (const id of ["shop", "catalog-grid", "catalog-empty", "cart-drawer", "cart-items", "checkout-form"]) {
-    assert.match(shopHtml, new RegExp(`id="${id}"`));
+    assert.match(shopHtml + storefrontUi, new RegExp(`id="${id}"`));
   }
 
   // Colour and size pickers are generated per product from the API payload.
   assert.match(script, /name="color"/);
   assert.match(script, /name="size"/);
-  assert.match(shopHtml, /name="name"[\s\S]*?autocomplete="name"/);
-  assert.match(shopHtml, /name="phone"[\s\S]*?autocomplete="tel"/);
+  assert.match(storefrontUi, /name="name"[\s\S]*?autocomplete="name"/);
+  assert.match(storefrontUi, /name="phone"[\s\S]*?autocomplete="tel"/);
   assert.match(script, /neosport-cart-v1/);
   assert.match(script, /localStorage\.setItem/);
   assert.match(script, /fetch\("\/api\/order"/);
@@ -284,7 +285,7 @@ test("online shop supports variants, a persistent cart, and customer checkout", 
 
 test("mobile navigation stays out of layout when closed and map marker has no logo", () => {
   assert.match(css, /\.js \.site-nav:not\(\.is-open\)\s*\{\s*display: none;/);
-  assert.match(shopCss, /@media \(max-width: 420px\)[\s\S]*?\.cart-item/);
+  assert.match(shopCss, /@media \(max-width: 767px\)[\s\S]*?\.cart-drawer/);
   const mapPin = html.match(/<div class="map-pin">[\s\S]*?<\/div>/)?.[0] ?? "";
   assert.doesNotMatch(mapPin, /<img|neosport-mark/);
   // The marker is drawn in CSS rather than reusing the brand logo.
@@ -435,6 +436,7 @@ test("production output is complete and excludes unused media", () => {
     "landing.css",
     "shop.css",
     "script.js",
+    "storefront-ui.js",
     "admin.html",
     "admin.css",
     "admin.js",
@@ -446,6 +448,8 @@ test("production output is complete and excludes unused media", () => {
     .filter((name) => statSync(join(root, "dist", "assets", name)).isFile())
     .sort();
   assert.deepEqual(productionAssets, [
+    "icons.svg",
+    "lucide-LICENSE",
     "neosport-hero.png",
     "neosport-hero.webp",
     "neosport-mark.png",
