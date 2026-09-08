@@ -860,7 +860,7 @@ test("the authorize URL leaves the OAuth state to Supabase", () => {
   assert.equal(url.searchParams.get("redirect_to"), "http://localhost:4173/api/auth/callback");
 
   // The callback must not compare a state it never sent.
-  assert.doesNotMatch(read("api/auth/callback.mjs"), /searchParams\.get\("state"\)/);
+  assert.doesNotMatch(read("auth-routes.mjs"), /searchParams\.get\("state"\)/);
 });
 
 test("an uploaded photo is re-encoded to WebP and capped in width", async () => {
@@ -1106,7 +1106,7 @@ test("the Telegram flow is stateless and only accepts your own contact", () => {
   assert.match(read("telegram-auth.mjs"), /status: "used"/);
 
   // The pages offer whichever methods the server reports.
-  assert.match(read("api/auth/me.mjs"), /telegramEnabled/);
+  assert.match(read("auth-routes.mjs"), /telegramEnabled/);
   assert.match(read("admin.js"), /telegramSignin/);
   assert.match(script, /data-telegram-signin/);
 });
@@ -1128,4 +1128,38 @@ test("a minimal Supabase response is not mistaken for a failure", async () => {
     if (status === 200) assert.deepEqual(result, [{ id: 1 }]);
     else assert.equal(result, null, `${status} with an empty body must resolve, not throw`);
   }
+});
+
+test("every /api/auth path is served by one Serverless Function", async () => {
+  const { resolveAction } = await import("../api/auth.mjs");
+  const { authRoutes } = await import("../auth-routes.mjs");
+
+  // Vercel's Hobby plan allows twelve functions per deployment, and going over
+  // fails the whole deploy rather than just the new endpoint.
+  const functions = readdirSync(join(root, "api"), { recursive: true }).filter((name) => String(name).endsWith(".mjs"));
+  assert.ok(functions.length <= 12, `${functions.length} functions is over the limit`);
+  assert.ok(functions.includes("auth.mjs"));
+
+  // The rewrite hands the rest of the path over as ?action=…
+  assert.match(read("vercel.json"), /"\/api\/auth\/\(\.\*\)"[\s\S]*?"\/api\/auth\?action=\$1"/);
+
+  for (const [path, action] of [
+    ["/api/auth?action=login", "login"],
+    ["/api/auth?action=telegram/status&next=%2Fshop", "telegram/status"],
+    ["/api/auth/login?next=/admin", "login"],
+    ["/api/auth/telegram/start", "telegram/start"],
+    ["/api/auth/me", "me"],
+  ]) {
+    assert.equal(resolveAction({ url: path }), action, `${path} must resolve to ${action}`);
+  }
+
+  // Every action the pages call has a handler, and nothing else does.
+  for (const action of ["login", "callback", "logout", "me", "telegram/start", "telegram/status"]) {
+    assert.equal(typeof authRoutes[action], "function", `${action} is missing`);
+  }
+  // An action named after an Object.prototype member must not resolve.
+  for (const inherited of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    assert.equal(authRoutes[inherited], undefined, `${inherited} must not resolve as a route`);
+  }
+  assert.match(read("api/auth.mjs"), /Object\.hasOwn\(authRoutes, action\)/);
 });

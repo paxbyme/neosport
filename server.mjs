@@ -3,16 +3,11 @@ import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import adminProductsHandler from "./api/admin/products.mjs";
 import adminStatsHandler from "./api/admin/stats.mjs";
-import authCallbackHandler from "./api/auth/callback.mjs";
-import authLoginHandler from "./api/auth/login.mjs";
-import authLogoutHandler from "./api/auth/logout.mjs";
-import authMeHandler from "./api/auth/me.mjs";
-import telegramStartHandler from "./api/auth/telegram/start.mjs";
-import telegramStatusHandler from "./api/auth/telegram/status.mjs";
-import telegramWebhookHandler from "./api/telegram/webhook.mjs";
+import authHandler from "./api/auth.mjs";
 import orderHandler from "./api/order.mjs";
 import ordersHandler from "./api/orders.mjs";
 import productsHandler from "./api/products.mjs";
+import telegramWebhookHandler from "./api/telegram/webhook.mjs";
 
 for (const filename of [".env.local", ".env"]) {
   if (!existsSync(filename)) continue;
@@ -70,14 +65,8 @@ createServer(async (request, response) => {
     "/api/orders": ordersHandler,
     "/api/admin/products": adminProductsHandler,
     "/api/admin/stats": adminStatsHandler,
-    "/api/auth/login": authLoginHandler,
-    "/api/auth/callback": authCallbackHandler,
-    "/api/auth/logout": authLogoutHandler,
-    "/api/auth/me": authMeHandler,
-    "/api/auth/telegram/start": telegramStartHandler,
-    "/api/auth/telegram/status": telegramStatusHandler,
     "/api/telegram/webhook": telegramWebhookHandler,
-  }[pathname];
+  }[pathname] || (pathname.startsWith("/api/auth/") ? authHandler : undefined);
 
   if (apiHandler) {
     try {

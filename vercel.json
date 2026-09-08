@@ -6,6 +6,7 @@
   "cleanUrls": false,
   "trailingSlash": false,
   "rewrites": [
+    { "source": "/api/auth/(.*)", "destination": "/api/auth?action=$1" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/shop", "destination": "/shop.html" }
   ]
