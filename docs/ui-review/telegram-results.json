@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-09-08T12:56:35.460Z",
+  "fixtureOnly": true,
+  "results": [
+    {
+      "width": 360,
+      "path": "/",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 360,
+      "path": "/shop",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 360,
+      "path": "/admin",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 390,
+      "path": "/",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 390,
+      "path": "/shop",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 390,
+      "path": "/admin",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 768,
+      "path": "/",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 768,
+      "path": "/shop",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 768,
+      "path": "/admin",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 1024,
+      "path": "/",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 1024,
+      "path": "/shop",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 1024,
+      "path": "/admin",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 1440,
+      "path": "/",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 1440,
+      "path": "/shop",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "width": 1440,
+      "path": "/admin",
+      "status": "passed",
+      "checks": "popup-blocked fallback, keyboard/focus/44px targets, Escape cancellation, automatic network retry, expiry/restart, successful return, account prefill/admin authorization",
+      "interceptedStarts": 3
+    },
+    {
+      "status": "passed",
+      "checks": "intercepted popup, short viewport, reload/resume, failed start and cancel recovery, cancellation/start and committed-session races, customer denied admin access"
+    }
+  ]
+}

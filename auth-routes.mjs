@@ -16,18 +16,22 @@ import {
   readOAuthState,
   readSession,
   safeNextPath,
-  serializeCookie,
   SESSION_COOKIE,
 } from "./auth-session.mjs";
 import { exchangeCodeForUser, googleAuthorizeUrl, isAuthConfigured } from "./auth-service.mjs";
 import {
   callTelegram,
+  cancelLoginToken,
   consumeVerifiedToken,
   createLoginToken,
+  createTelegramCookie,
   isTelegramAuthConfigured,
   LOGIN_TOKEN_MAX_AGE_MS,
+  loginTokenStatus,
+  readTelegramToken,
   TELEGRAM_COOKIE,
 } from "./telegram-auth.mjs";
+import { checkRateLimit, clientAddress } from "./rate-limit.mjs";
 
 const query = (request) => new URL(request.url, "http://localhost").searchParams;
 
@@ -94,8 +98,12 @@ const callback = async (request, response) => {
   }
 };
 
-const logout = (request, response) =>
-  redirect(response, safeNextPath(query(request).get("next")), clearCookie(SESSION_COOKIE, { request }));
+const logout = async (request, response) => {
+  if (!requireGet(request, response)) return;
+  const token = readTelegramToken(request);
+  await cancelLoginToken(token).catch(() => {});
+  redirect(response, safeNextPath(query(request).get("next")), [clearCookie(SESSION_COOKIE, { request }), clearCookie(TELEGRAM_COOKIE, { request })]);
+};
 
 const me = (request, response) => {
   const session = readSession(request);
@@ -116,48 +124,86 @@ const me = (request, response) => {
 
 /* ----------------------------------------------------------- Telegram --- */
 
-// Cached per warm instance: the username never changes and getMe is a round trip.
-let cachedBotUsername = "";
+// Short-lived cache follows the configured token and tolerates bot renaming.
+let cachedBot = null;
 
 const botUsername = async (environment) => {
-  if (cachedBotUsername) return cachedBotUsername;
+  if (cachedBot?.token === environment.TELEGRAM_BOT_TOKEN && cachedBot.expiresAt > Date.now()) return cachedBot.username;
   const bot = await callTelegram("getMe", {}, environment);
-  cachedBotUsername = String(bot?.username || "");
-  if (!cachedBotUsername) throw new AuthError("Telegram bot topilmadi.", 502);
-  return cachedBotUsername;
+  const username = String(bot?.username || "");
+  if (!/^[A-Za-z0-9_]{5,32}$/.test(username)) throw new AuthError("Telegram bot topilmadi.", 502);
+  cachedBot = { token: environment.TELEGRAM_BOT_TOKEN, username, expiresAt: Date.now() + 5 * 60 * 1000 };
+  return username;
 };
 
 const telegramStart = async (request, response) => {
   if (!requireGet(request, response)) return;
+  if (!isTelegramAuthConfigured()) throw new AuthError("Telegram orqali kirish hali sozlanmagan.", 503);
+  if (!checkRateLimit("telegram-login", clientAddress(request), { max: 10, windowMs: 10 * 60 * 1000 })) {
+    response.setHeader("Retry-After", "600");
+    throw new AuthError("Ko‘p urinish bo‘ldi. Birozdan keyin qayta urinib ko‘ring.", 429);
+  }
 
   const next = safeNextPath(query(request).get("next"));
-  const [token, username] = await Promise.all([createLoginToken(next), botUsername(process.env)]);
+  // Resolve the bot before creating a database row, then retire this browser's
+  // previous attempt so a retry cannot later complete an abandoned sign-in.
+  const username = await botUsername(process.env);
+  await cancelLoginToken(readTelegramToken(request));
+  const token = await createLoginToken(next);
+  const cookie = createTelegramCookie(token, { request });
+  const url = `https://t.me/${username}?start=${encodeURIComponent(token)}`;
+  if (String(request.headers.accept || "").includes("application/json")) {
+    response.setHeader("Set-Cookie", cookie);
+    return sendJson(response, 200, { ok: true, url, expiresIn: LOGIN_TOKEN_MAX_AGE_MS / 1000 });
+  }
 
   // The token travels to Telegram in the link and stays with this browser in an
   // HttpOnly cookie, so only the tab that started the flow can finish it.
   redirect(
     response,
-    `https://t.me/${username}?start=${encodeURIComponent(token)}`,
-    serializeCookie(TELEGRAM_COOKIE, token, {
-      maxAge: Math.floor(LOGIN_TOKEN_MAX_AGE_MS / 1000),
-      request,
-    }),
+    url,
+    cookie,
   );
 };
 
 // Polled by the page the user left behind while they talked to the bot.
 const telegramStatus = async (request, response) => {
-  const token = parseCookies(request.headers.cookie)[TELEGRAM_COOKIE];
-  if (!token) return sendJson(response, 200, { ok: true, ready: false, waiting: false });
+  if (!requireGet(request, response)) return;
+  const token = readTelegramToken(request);
+  if (!token) {
+    const invalid = Boolean(parseCookies(request.headers.cookie)[TELEGRAM_COOKIE]);
+    if (invalid) response.setHeader("Set-Cookie", clearCookie(TELEGRAM_COOKIE, { request }));
+    return sendJson(response, 200, { ok: true, ready: false, waiting: false, state: invalid ? "expired" : "idle" });
+  }
+  if (!isTelegramAuthConfigured()) throw new AuthError("Telegram orqali kirish hali sozlanmagan.", 503);
 
   const result = await consumeVerifiedToken(token);
-  if (!result) return sendJson(response, 200, { ok: true, ready: false, waiting: true });
+  if (!result) {
+    const status = await loginTokenStatus(token);
+    const waiting = ["pending", "verified"].includes(status.state);
+    if (!waiting) response.setHeader("Set-Cookie", clearCookie(TELEGRAM_COOKIE, { request }));
+    return sendJson(response, 200, { ok: true, ready: false, waiting, ...status });
+  }
 
   response.setHeader("Set-Cookie", [
     createSessionCookie(result.user, { request }),
     clearCookie(TELEGRAM_COOKIE, { request }),
   ]);
-  return sendJson(response, 200, { ok: true, ready: true, next: result.next });
+  return sendJson(response, 200, { ok: true, ready: true, state: "ready", next: safeNextPath(result.next) });
+};
+
+const telegramCancel = async (request, response) => {
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "POST");
+    return sendJson(response, 405, { ok: false, message: "Faqat POST so‘rovi qabul qilinadi." });
+  }
+  // A JSON-only request cannot be forged with a cross-site HTML form.
+  if (!String(request.headers["content-type"] || "").startsWith("application/json") || request.headers["sec-fetch-site"] === "cross-site") {
+    throw new AuthError("Noto‘g‘ri so‘rov.", 403);
+  }
+  await cancelLoginToken(readTelegramToken(request));
+  response.setHeader("Set-Cookie", clearCookie(TELEGRAM_COOKIE, { request }));
+  return sendJson(response, 200, { ok: true, state: "cancelled" });
 };
 
 // A null prototype means an action named "constructor" or "__proto__" cannot
@@ -170,5 +216,6 @@ export const authRoutes = Object.freeze(
     me,
     "telegram/start": telegramStart,
     "telegram/status": telegramStatus,
+    "telegram/cancel": telegramCancel,
   }),
 );

@@ -8,9 +8,10 @@
     "build": "npm run images:optimize && node build.mjs",
     "dev": "node server.mjs",
     "start": "node server.mjs",
-    "test": "npm run build && node --test tests/smoke.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "db:migrate": "node migrate.mjs",
-    "telegram:setup": "node telegram-setup.mjs"
+    "telegram:setup": "node telegram-setup.mjs",
+    "telegram:check": "node telegram-setup.mjs --check"
   },
   "devDependencies": {
     "pg": "^8.23.0"

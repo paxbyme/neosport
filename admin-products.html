@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080a08" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>NeoSport — Statistika</title>
+    <title>NeoSport — Mahsulotlar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,21 +16,27 @@
     <link rel="stylesheet" href="/admin.css" />
     <link rel="stylesheet" href="/telegram-login.css" />
   </head>
-  <body data-admin-page="stats">
+  <body data-admin-page="products">
     <a class="skip-link" href="#admin-panel">Asosiy qismga o‘tish</a>
     <header class="admin-header"></header>
     <div class="admin-shell" id="admin-shell" hidden>
       <main class="admin-main">
-        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Statistika</h1><p id="admin-view-description">Buyurtmalar va katalog holati.</p></div>
+        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Mahsulotlar</h1><p id="admin-view-description">Katalogni ko‘ring va mahsulotlarni boshqaring.</p></div>
         <section class="admin-panel" id="admin-panel" hidden>
-        <section class="stats-section" id="stats" data-admin-view="stats" aria-labelledby="stats-title">
+        <section class="product-list-section" id="products" data-admin-view="products" aria-labelledby="product-list-title">
           <div class="form-heading">
-            <div><h2 id="stats-title">Buyurtmalar va katalog</h2></div>
-            <button class="stats-refresh" id="stats-refresh" type="button">Yangilash</button>
+            <div><h2 id="product-list-title">Katalog</h2></div>
+            <p id="product-count" role="status">Yuklanmoqda...</p>
           </div>
-          <div class="stats-body" id="stats-body" aria-live="polite">
-            <p class="admin-empty">Statistika yuklanmoqda...</p>
+          <div class="admin-catalog-toolbar">
+            <label class="field search-field"><span>Qidirish</span><input id="admin-search" type="search" placeholder="Mahsulot yoki brend" autocomplete="off" /></label>
+            <label class="field"><span>Kategoriya</span><select id="admin-category-filter"><option value="">Barchasi</option></select></label>
+            <label class="field"><span>Holati</span><select id="admin-status-filter"><option value="">Barchasi</option><option value="active">Faol</option><option value="inactive">Nofaol</option></select></label>
+            <button class="secondary-button" id="admin-reset-filters" type="button" hidden>Tozalash</button>
           </div>
+          <p class="admin-status" id="product-list-status" role="status"></p>
+          <button class="secondary-button" id="products-retry" type="button" hidden>Qayta urinish</button>
+          <div class="admin-product-list" id="admin-product-list"></div>
         </section>
         </section>
       </main>
@@ -79,6 +85,6 @@
     </div>
 
     <script src="/telegram-login.js"></script>
-    <script type="module" src="/admin-stats.js"></script>
+    <script type="module" src="/admin-products.js"></script>
   </body>
 </html>

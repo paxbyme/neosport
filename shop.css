@@ -12,7 +12,7 @@
 :is(.shop-page, .landing) .site-header { height: var(--header-height); gap: 20px; }
 :is(.shop-page, .landing) .brand { font-size: 23px; line-height: .88; }
 :is(.shop-page, .landing) .brand img { width: 34px; height: 40px; }
-:is(.shop-page, .landing) .brand, :is(.shop-page, .landing) .footer-links a { min-height: 44px; display: inline-flex; align-items: center; }
+:is(.shop-page, .landing) .brand, :is(.shop-page, .landing) .footer-links a { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; }
 :is(.shop-page, .landing) .skip-link { min-height: 44px; }
 :is(.shop-page, .landing) .header-actions { display: flex; gap: 12px; font-size: 12px; text-transform: none; }
 :is(.shop-page, .landing) .account { gap: 6px; }
@@ -20,6 +20,7 @@
 :is(.shop-page, .landing) .cart-toggle { min-width: 44px; min-height: 44px; gap: 10px; padding: 0 10px; border-radius: 8px; font-size: 12px; text-transform: none; }
 :is(.shop-page, .landing) .cart-count { min-width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
 :is(.shop-page, .landing) .button { border-radius: 8px; font-size: 12px; text-transform: none; }
+.landing .site-nav a, .landing .header-shop-link, .landing .header-cta, .landing .social-handle { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; }
 .shop-page { padding-bottom: 0; }
 .shop-page .site-header { grid-template-columns: 208px 1fr auto; padding-inline: max(24px, calc((100% - 1552px) / 2)); }
 .shop-brand-group { display: flex; align-items: center; gap: 8px; }

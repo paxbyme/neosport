@@ -37,7 +37,10 @@ export const parseCookies = (header) => {
     const index = part.indexOf("=");
     if (index < 1) continue;
     const name = part.slice(0, index).trim();
-    if (name) cookies[name] = decodeURIComponent(part.slice(index + 1).trim());
+    if (name) {
+      try { cookies[name] = decodeURIComponent(part.slice(index + 1).trim()); }
+      catch { /* A malformed unrelated cookie must not break sign-in. */ }
+    }
   }
   return cookies;
 };

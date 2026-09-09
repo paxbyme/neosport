@@ -72,10 +72,6 @@ a {
   outline-color: var(--white);
 }
 
-.topline a:focus-visible {
-  outline-color: var(--ink);
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -104,40 +100,7 @@ a {
   transform: translateY(0);
 }
 
-.topline {
-  position: relative;
-  z-index: 40;
-  min-height: 30px;
-  padding: 0 clamp(16px, 3vw, 40px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  color: var(--ink);
-  background: var(--lime);
-  font: 700 10px/1 var(--body);
-  letter-spacing: 0.14em;
-  text-align: center;
-}
-
-.topline p {
-  margin: 0;
-}
-
-.topline a {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: opacity 160ms ease;
-}
-
-.topline a:hover {
-  opacity: 0.62;
-}
-
-/* Static bar in the flow rather than an overlay,
-so the page starts below it —
-   the retail convention,
-and it keeps the product grid the first thing seen. */
+/* The sticky header stays in the page flow above the hero. */
 .site-header {
   position: sticky;
   top: 0;
@@ -210,7 +173,7 @@ and it keeps the product grid the first thing seen. */
   bottom: 2px;
   height: 1px;
   background: var(--lime);
-  transition: right 220ms ease;
+  transition: right 180ms ease;
 }
 
 .site-nav a:hover::after,
@@ -546,7 +509,7 @@ dark rule on the light one. */
     pointer-events: none;
     visibility: hidden;
     transform: translateY(-18px);
-    transition: opacity 220ms ease, visibility 220ms ease, transform 220ms ease;
+    transition: opacity 180ms ease, visibility 180ms ease, transform 180ms ease;
   }
 
   .js .site-nav:not(.is-open) {
@@ -659,12 +622,6 @@ dark rule on the light one. */
     overflow-x: hidden;
     scroll-behavior: auto;
   }
-
-  .topline {
-    justify-content: center;
-  }
-
-  .topline p { display: none; }
 
   .site-header { padding-left: 5vw; padding-right: 5vw; }
 

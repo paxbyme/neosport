@@ -27,6 +27,12 @@ const waitFor = async (page, fn) => page.waitForFunction(fn);
 const assertNoOverflow = async (page) => {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await page.locator("button button, button a, a button").count(), 0);
+  const controls = await page.evaluate(() => [...document.querySelectorAll("button,a[href],input,select")].filter(el => el.getClientRects().length && !el.closest('[inert],[aria-hidden="true"]') && !el.disabled && getComputedStyle(el).visibility !== "hidden").flatMap(el => {
+    const box = (el.matches('input[type="radio"]') ? el.closest("label") : el).getBoundingClientRect();
+    const named = el.getAttribute("aria-label") || el.textContent.trim() || el.labels?.length;
+    return box.width < 44 || box.height < 44 || !named ? [{ element: el.outerHTML.slice(0,150), width: box.width, height: box.height, named: Boolean(named) }] : [];
+  }));
+  assert.deepEqual(controls, [], "Accessible labels and 44px touch targets");
 };
 
 try {
@@ -57,9 +63,9 @@ try {
     await assertNoOverflow(page);
     const gridTracks = await page.locator(".catalog-grid").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length);
     assert.equal(gridTracks, width >= 1440 ? 3 : 2);
+    await capture(page, { path: `${output}shop-${width}.png`, fullPage: true });
     assert.equal(await page.locator(".catalog-card img").evaluateAll(images => images.every(img => img.complete && img.naturalWidth > 0 && !img.dataset.fallback)), true);
     assert.equal(await page.locator(".catalog-card-price small").first().textContent(), "so‘m");
-    await capture(page, { path: `${output}shop-${width}.png`, fullPage: true });
 
     await page.locator("#catalog-search").fill(product.brand.toLowerCase());
     assert.equal(await page.locator(".catalog-card").count(), products.filter(p => p.brand.toLowerCase().includes(product.brand.toLowerCase()) || p.name.toLowerCase().includes(product.brand.toLowerCase())).length);
@@ -148,14 +154,27 @@ try {
     await assertNoOverflow(page);
     assert.equal(await page.locator('[aria-label="Google orqali kirish"]').getAttribute("href"), "/api/auth/login?next=%2F");
     assert.equal(await page.locator('[data-telegram-signin]').getAttribute("href"), "/api/auth/telegram/start?next=%2F");
+    assert.equal(await page.locator('a[href="/admin"]').count(), 0);
+    for (const target of ["new", "collection", "about", "store"]) assert.equal(await page.locator(`#${target}`).count(), 1);
+    assert.equal(await page.locator('.hero-actions [href="/shop"]').count(), 1);
+    assert.ok(await page.locator('a[href="https://yandex.uz/maps/-/CTgRbPmH"]').count() > 0);
+    assert.ok(await page.locator('a[href="https://www.instagram.com/neosport_namangan/"]').count() > 0);
     await page.unroute("**/api/auth/me");
     await page.reload({ waitUntil: "networkidle" });
+    assert.ok(await page.locator("#new").evaluate(el => el.getBoundingClientRect().top < innerHeight), "Next section starts within the first viewport");
     await capture(page, { path: `${output}home-${width}.png`, fullPage: true });
     if (width === 390 || width === 1440) await capture(page, { path: `${output}home-viewport-${width}.png` });
     if (width <= 900) {
       await page.locator(".menu-toggle").click();
       await page.locator(".landing-menu-close").click();
       assert.equal(await page.locator(".menu-toggle").evaluate(el => el === document.activeElement), true);
+    }
+    for (const target of ["new", "collection", "about", "store"]) {
+      if (width <= 900) await page.locator(".menu-toggle").click();
+      await page.locator(`.site-nav a[href="#${target}"]`).click();
+      assert.equal(new URL(page.url()).hash, `#${target}`);
+      const targetBox = await page.locator(`#${target}`).boundingBox();
+      assert.ok(targetBox.y >= 0 && targetBox.y < page.viewportSize().height);
     }
     await page.locator(".catalog-card-action").first().click();
     await page.locator('input[name="size"]').first().check();
@@ -226,7 +245,7 @@ try {
   live.products = preview;
   mode = "empty";
   await page.reload({ waitUntil: "networkidle" });
-  assert.match(await page.locator("#catalog-empty").innerText(), /Yangi modellar tez orada/);
+  assert.match(await page.locator("#catalog-empty").innerText(), /Hozircha mahsulot yo‘q/);
   assert.doesNotMatch(await page.locator("#catalog-empty").innerText(), /admin/i);
   results.push({ status: "passed", checks: "catalog loading, error, retry, empty, saved cart retained after fetch failure, long cart, responsive cart transitions, short viewport input focus, 320px single column, isolated nine-product grid" });
   writeFileSync(`${output}results.json`, JSON.stringify(results, null, 2) + "\n");

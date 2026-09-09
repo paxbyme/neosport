@@ -11,9 +11,20 @@ const files = [
   "shop.css",
   "script.js",
   "storefront-ui.js",
+  "telegram-login.js",
+  "telegram-login.css",
   "admin.html",
   "admin.css",
-  "admin.js",
+  "admin-categories.html",
+  "admin-products.html",
+  "admin-product.html",
+  "admin-customers.html",
+  "admin-shell.js",
+  "admin-stats.js",
+  "admin-categories.js",
+  "admin-products.js",
+  "admin-product.js",
+  "admin-customers.js",
 ];
 const assets = ["neosport-hero.png", "neosport-hero.webp", "neosport-mark.png", "neosport-mark.webp", "icons.svg", "lucide-LICENSE"];
 

@@ -413,7 +413,7 @@ const productCard = (product) => `
 
 const renderEmptyCatalog = (hasFilters) => {
   if (!catalogEmpty) return;
-  catalogEmpty.innerHTML = `${icon(catalogFailed ? "rotate-ccw" : "package-open")}<h3>${catalogFailed ? "Mahsulotlar yuklanmadi" : hasFilters ? "Mos mahsulot topilmadi" : "Yangi modellar tez orada"}</h3><p>${catalogFailed ? "Ulanishni tekshirib, yana urinib ko‘ring." : hasFilters ? "Boshqa nom yoki o‘lcham bilan qidirib ko‘ring." : "Kolleksiyamiz yangilanmoqda. Yangiliklarni Instagram sahifamizda kuzating."}</p>${catalogFailed ? '<button class="text-button" type="button" data-catalog-retry>Qayta urinish</button>' : hasFilters ? '<button class="text-button" type="button" data-reset-filters>Filtrlarni tozalash</button>' : '<a class="text-button" href="https://www.instagram.com/neosport_namangan/" target="_blank" rel="noopener noreferrer">Instagramda ko‘rish</a>'}`;
+  catalogEmpty.innerHTML = `${icon(catalogFailed ? "rotate-ccw" : "package-open")}<h3>${catalogFailed ? "Mahsulotlar yuklanmadi" : hasFilters ? "Mos mahsulot topilmadi" : "Hozircha mahsulot yo‘q"}</h3><p>${catalogFailed ? "Ulanishni tekshirib, yana urinib ko‘ring." : hasFilters ? "Boshqa nom yoki o‘lcham bilan qidirib ko‘ring." : "Mavjud modellar haqida Instagram sahifamizda so‘rashingiz mumkin."}</p>${catalogFailed ? '<button class="text-button" type="button" data-catalog-retry>Qayta urinish</button>' : hasFilters ? '<button class="text-button" type="button" data-reset-filters>Filtrlarni tozalash</button>' : '<a class="text-button" href="https://www.instagram.com/neosport_namangan/" target="_blank" rel="noopener noreferrer">Instagramda ko‘rish</a>'}`;
 };
 
 const renderCatalog = (products) => {
@@ -874,7 +874,7 @@ const loadAccount = async () => {
 
     // Returning to this tab after talking to the bot: pick the flow back up.
     if (!account) {
-      if (await checkTelegramLogin()) waitForTelegram();
+      if (result.telegramEnabled) window.NeoSportTelegram?.resume();
       return;
     }
     // Whatever the account knows, the customer should not have to retype.

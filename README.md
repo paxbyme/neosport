@@ -39,9 +39,9 @@ Admin panelda mahsulot qo‘shish, tahrirlash, faol/nofaol qilish va chegirma e�
 
 ### Kategoriyalar
 
-Kategoriyalar admin panelning alohida bo‘limida (`02 KATEGORIYALAR`) boshqariladi va `categories` jadvalida saqlanadi (lokal rejimda `data/categories.json`). Bo‘lim birinchi ochilganda ro‘yxat o‘zi to‘ldiriladi: ilgari formaga qattiq yozilgan nomlar hamda katalogdagi mahsulotlarda uchraydigan har qanday boshqa kategoriya kiritiladi.
+Kategoriyalar `/admin/categories` sahifasida boshqariladi va `categories` jadvalida saqlanadi (lokal rejimda `data/categories.json`). Sahifa birinchi ochilganda ro‘yxat o‘zi to‘ldiriladi: ilgari formaga qattiq yozilgan nomlar hamda katalogdagi mahsulotlarda uchraydigan har qanday boshqa kategoriya kiritiladi.
 
-Har bir kategoriyaning **o‘lcham turi** bor — «Kiyim» (S–4XL) yoki «Oyoq kiyim» (36–45). Mahsulot formasidagi o‘lchamlar ro‘yxati shu turdan kelib chiqadi, ya’ni yangi qo‘shilgan kategoriya ham darrov to‘g‘ri o‘lchamlarni taklif qiladi. Bo‘limda kategoriyani qo‘shish, nomini va turini tahrirlash, tartibini ↑↓ bilan o‘zgartirish, nofaol qilish va o‘chirish mumkin:
+Har bir kategoriyaning **o‘lcham turi** bor — «Kiyim» (S–4XL) yoki «Oyoq kiyim» (36–45). Mahsulot formasidagi o‘lchamlar ro‘yxati shu turdan kelib chiqadi, ya’ni yangi qo‘shilgan kategoriya ham darrov to‘g‘ri o‘lchamlarni taklif qiladi. Sahifada kategoriyani qo‘shish, nomini va turini tahrirlash, tartibini ↑↓ bilan o‘zgartirish, nofaol qilish va o‘chirish mumkin:
 
 - **Nomini o‘zgartirish** — o‘sha kategoriyadagi barcha mahsulotlar avtomatik yangi nomga o‘tadi (mahsulotda kategoriya matn sifatida saqlanadi).
 - **Nofaol qilish** — kategoriya yangi mahsulot formasida ko‘rinmaydi, lekin mavjud mahsulotlar o‘z nomini saqlab qoladi.
@@ -68,20 +68,30 @@ Saytda ham mijozlar, ham admin **Google hisobi** bilan kiradi. Oqim serverda kec
 
 Email'i yo‘q mijoz uchun ikkinchi yo‘l: **telefon raqamini Telegram bot orqali tasdiqlash**. Bu yerda ro‘yxatdan o‘tish va kirish bitta harakat — kontaktni ulashish.
 
-1. Mijoz «Telegram» tugmasini bosadi. `/api/auth/telegram/start` bir martalik token yaratadi (`login_tokens`), uni **HttpOnly** cookie'ga yozadi va `t.me/<bot>?start=<token>` ga yo‘naltiradi.
-2. Botdagi `/start <token>` webhook'ga keladi. Token qaysi chat ochganini yozib qo‘yadi — kontakt keyin **alohida** webhook chaqiruvida, boshqa instance'da kelishi mumkin.
-3. Mijoz «📱 Telefon raqamni ulashish» tugmasini bosadi. Server kontakt egasi yuboruvchining o‘zi ekanini tekshiradi (birovning kontakt kartasi bilan kirib bo‘lmaydi), tokenni tasdiqlangan deb belgilaydi va mijozni `users` jadvaliga yozadi. Birinchi marta — ro‘yxatdan o‘tish, keyingilarida faqat `last_login_at` yangilanadi.
-4. Ortda qolgan sahifa `/api/auth/telegram/status` ni so‘rab turadi. Token bir marta sarflanadi va sessiya cookie'si o‘rnatiladi.
+1. Mijoz «Telegram» tugmasini bosadi. Bosh sahifa, `/shop` va `/admin` bitta `telegram-login.js` dialogidan foydalanadi. `/api/auth/telegram/start` bir martalik 10 daqiqalik token yaratadi (`login_tokens`), imzolangan brauzer dalilini **HttpOnly** `ns_tg` cookie’siga yozadi va JSON orqali bot havolasini qaytaradi. Oddiy havola orqali kirish uchun avvalgi 302 yo‘naltirish ham ishlaydi.
+2. Botdagi `/start <token>` webhook’ga keladi. Faqat shaxsiy chat qabul qilinadi. Token uni birinchi ochgan Telegram hisobiga atomar bog‘lanadi; boshqa hisobga almashtirib bo‘lmaydi.
+3. Mijoz «📱 Telefon raqamni ulashish» tugmasini bosadi. Server kontakt egasi yuboruvchining o‘zi ekanini, telefon raqamini va token muddatini tekshiradi. Tasdiqlangan mijoz avvalgi `users` jadvaliga yoziladi.
+4. Mijoz **kirishni boshlagan brauzer sahifasiga qaytadi**. Dialog `/api/auth/telegram/status` orqali kutadi, vaqtinchalik ulanish xatosidan keyin avtomatik qayta tekshiradi va ilovadan qaytilganda davom etadi. Token faqat bir marta sarflanadi, imzolangan `ns_session` cookie’si o‘rnatiladi va mijoz boshlang‘ich sahifasiga qaytadi.
 
-Token 10 daqiqa yashaydi, eskirganlari keyingi kirishda tozalanadi. Sessiyada email o‘rniga tasdiqlangan raqam turadi: u savatchadagi telefon maydonini to‘ldiradi, buyurtmaga `user_phone` bo‘lib yoziladi va operatorga ketadigan xabarda «Tasdiqlangan hisob» qatorida ko‘rinadi. `ADMIN_PHONES` dagi raqam bilan kirgan odam admin bo‘ladi.
+Popup bloklansa, «Telegramni ochish» havolasi qoladi. Dialog holati sahifa yangilanganda tiklanadi; brauzer xotirasida token yoki sir saqlanmaydi. Havola eskirsa qaytadan boshlash mumkin. Escape yoki yopish tugmasi `POST /api/auth/telegram/cancel` orqali kutilayotgan kirishni bekor qiladi. Chiqish kutilayotgan kirishni ham tozalaydi.
 
-Webhook'ni ro‘yxatdan o‘tkazish (bot tokeni bo‘lgan muhitda bir marta, keyin domen yoki sir o‘zgarganda):
+Tasdiqlangan ism va telefon savatchada avtomatik to‘ldiriladi. Avvalgi buyurtma tarixi, `tg:<chatId>` mijoz identifikatori va Telegram buyurtma xabarlari saqlangan. `ADMIN_PHONES` dagi raqamlar admin huquqini oladi; bu ro‘yxat har bir sessiya tekshiruvida qayta qo‘llanadi. Mijozlarga admin navigatsiyasi ko‘rsatilmaydi.
+
+Sozlash uchun server muhitida `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` (16–256 ta harf, raqam, `_` yoki `-`), `SESSION_SECRET` (kamida 32 belgi), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` va aniq HTTPS `SITE_URL` bo‘lishi kerak. `supabase-schema.sql` dagi `login_tokens` va `users` jadvallari talab qilinadi. Bot tokeni va servis kaliti hech qachon brauzerga berilmaydi. Telegram tugmasi faqat zarur kirish sozlamalari mavjud bo‘lganda ko‘rinadi.
 
 ```bash
+# Faqat o‘qish: konfiguratsiya, bot, jadval/ustunlar va webhook manzilini tekshiradi.
+# Mijoz ma’lumotlarini yuklamaydi, webhook yoki katalogni o‘zgartirmaydi.
+npm run telegram:check
+
+# Webhook’ni SITE_URL uchun ro‘yxatdan o‘tkazadi; kutilayotgan xabarlarni saqlaydi.
+# Bot tokeni bo‘lgan muhitda, dastlab va domen/webhook siri o‘zgarganda ishlating.
 npm run telegram:setup
 ```
 
-Bu `setWebhook` ni `<SITE_URL>/api/telegram/webhook` manziliga chaqiradi va `getWebhookInfo` natijasini ko‘rsatadi. `vercel env pull` production sirlarini `[SENSITIVE]` qilib beradi, shuning uchun buyruqni ishlatish uchun `TELEGRAM_BOT_TOKEN` va `TELEGRAM_WEBHOOK_SECRET` ni Development muhitiga ham qo‘shing.
+`--check` Telegram saqlagan webhook sirini tekshira olmaydi, chunki API uni qaytarmaydi. Yakuniy tekshiruv: sayt orqali kirishni boshlang, botda o‘z raqamingizni ulashing va boshlang‘ich brauzer tabiga qayting. Localhost’ga Telegram webhook yubora olmaydi; haqiqiy sinov HTTPS muhitida bajariladi. `vercel env pull` dan kelgan `[SENSITIVE]` qiymatlar sir o‘rnini bosa olmaydi — haqiqiy qiymatlarni server muhitiga yoki mahalliy `.env.local` fayliga xavfsiz kiriting.
+
+Yangilanish avval boshlangan, imzosiz `ns_tg` urinishlarini bekor qiladi; ular qaytadan boshlanadi. Mavjud `ns_session` sessiyalari va saqlangan savatchalar o‘zgarmaydi. Yangi jadval yoki ma’lumotlar migratsiyasi qo‘shilmadi. Kirish urinishlariga mavjud xotira asosidagi cheklov qo‘llanadi (instance va manzil uchun 10 daqiqada 10 urinish).
 
 ## Statistika
 
@@ -90,6 +100,16 @@ Bu `setWebhook` ni `<SITE_URL>/api/telegram/webhook` manziliga chaqiradi va `get
 Buyurtmalar `orders` jadvalida (lokalda `data/orders.json` da) saqlanadi. Bu fayl mijoz ismi va telefon raqamini saqlagani uchun `.gitignore` da. Jadval hali yaratilmagan bo‘lsa statistika katalog qismini ko‘rsatishda davom etadi.
 
 Keyingi bosqichlar uchun reja: [docs/admin-panel-reja.md](docs/admin-panel-reja.md).
+
+## Mijozlar
+
+`/admin/customers` sahifasi `GET /api/admin/customers` dan ro‘yxatni oladi: ism, telefon (bosilsa qo‘ng‘iroq qilinadi), ro‘yxatdan o‘tgan va oxirgi kirgan sanasi, buyurtmalar soni, jami xarid summasi va oxirgi buyurtma sanasi. Ism yoki telefon bo‘yicha qidirish, oxirgi harakat / xarid summasi / buyurtmalar soni / ro‘yxatdan o‘tgan sana bo‘yicha tartiblash mumkin. Sahifa faqat o‘qiydi — panel orqali mijoz qo‘shilmaydi, o‘zgartirilmaydi va o‘chirilmaydi.
+
+Ro‘yxat `users` jadvalidan olinadi, buyurtmalar esa ikki yo‘l bilan mijozga bog‘lanadi: kirgan holda berilgan buyurtma `user_id` bilan, kirishdan oldin berilgani telefon raqami bilan. Shuning uchun bitta buyurtma ikki marta hisoblanmaydi. Bitta raqamda ikkita Telegram hisobi bo‘lsa, kirishdan oldingi buyurtmalar eskiroq hisobga yoziladi.
+
+Mijozni qo‘shish paneldan emas: xaridor Telegram orqali o‘zi ro‘yxatdan o‘tadi. Admin huquqi esa `ADMIN_EMAILS` va `ADMIN_PHONES` orqali beriladi.
+
+Ma’lumotlar bazasi ulanmagan bo‘lsa (lokal ish), ro‘yxat `data/orders.json` dagi buyurtmalardan tuziladi va panel buni alohida yozib qo‘yadi. `orders` jadvali mavjud bo‘lmasa mijozlar baribir ko‘rinadi, faqat xarid summalari bo‘sh qoladi.
 
 ## Buyurtma oqimi
 

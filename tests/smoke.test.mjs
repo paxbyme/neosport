@@ -20,6 +20,7 @@ import { callTelegram, isTelegramAuthConfigured, verifyWebhookSecret } from "../
 import { callbackUrl, googleAuthorizeUrl, isAuthConfigured } from "../auth-service.mjs";
 import { resetRateLimits } from "../rate-limit.mjs";
 import { supabaseRequest } from "../supabase.mjs";
+import { listCustomers } from "../customer-service.mjs";
 import { registerTelegramUser, telegramUserId } from "../user-service.mjs";
 
 const fakeRequest = (headers = {}) => ({ headers, socket: { remoteAddress: "203.0.113.7" } });
@@ -55,7 +56,7 @@ test("hero prioritizes the separate shop and retains collection browsing", () =>
   assert.match(heroActions, /class="button button-primary" href="\/shop"/);
   assert.match(heroActions, /class="button button-ghost" href="#collection"/);
   assert.ok(heroActions.indexOf("button-primary") < heroActions.indexOf("button-ghost"));
-  assert.match(html, /class="mobile-actions"/);
+  assert.match(html, /class="cart-toggle"/);
 });
 
 test("the landing page ships no hardcoded products", () => {
@@ -121,7 +122,8 @@ test("shop uses the same retail layout system as the landing page", () => {
   assert.match(shopHtml, /<h1 id="catalog-title">/);
   for (const page of [html, shopHtml]) assert.match(page, /src="storefront-ui\.js"/);
 
-  // Product detail is rendered into the modal: image column beside a sticky buy panel.
+  // Product detail is rendered into its own page: image column beside a sticky
+  // buy panel. The popup it used to open in is gone from every surface.
   assert.match(script, /<article class="pdp">/);
   assert.match(script, /class="pdp-media"/);
   assert.match(script, /class="pdp-panel"/);
@@ -156,7 +158,7 @@ test("all conversion links use verified destinations and analytics attributes", 
     .map((match) => match[0])
     .filter((anchor) => anchor.includes(instagram) || anchor.includes(maps));
 
-  assert.ok(externalAnchors.length >= 10);
+  assert.deepEqual(new Set(externalAnchors.map(anchor => anchor.match(/href="([^"]+)"/)?.[1])), new Set([instagram, maps]));
 
   for (const anchor of externalAnchors) {
     const href = anchor.match(/href="([^"]+)"/)?.[1];
@@ -293,8 +295,8 @@ test("mobile navigation stays out of layout when closed and map marker has no lo
 });
 
 test("admin panel and server-side product management are wired", () => {
-  const adminHtml = read("admin.html");
-  const adminScript = read("admin.js");
+  const adminHtml = read("admin-product.html");
+  const adminScript = read("admin-product.js");
 
   assert.match(adminHtml, /id="login-form"/);
   assert.match(adminHtml, /id="product-admin-form"/);
@@ -326,7 +328,7 @@ test("the catalog starts empty and is filled from the admin panel", () => {
   assert.match(script, /if \(catalogEmpty\) catalogEmpty\.hidden = products\.length > 0;/);
 
   // The admin list has an empty state of its own.
-  assert.match(read("admin.js"), /admin-empty/);
+  assert.match(read("admin-products.js"), /admin-empty/);
 });
 
 test("Telegram order service recalculates trusted totals and formats customer details", async () => {
@@ -428,6 +430,56 @@ test("an empty catalog rejects orders instead of trusting the client", async () 
   );
 });
 
+const adminPages = [
+  ["/admin", "admin.html", "admin-stats.js"],
+  ["/admin/categories", "admin-categories.html", "admin-categories.js"],
+  ["/admin/products", "admin-products.html", "admin-products.js"],
+  ["/admin/product", "admin-product.html", "admin-product.js"],
+  ["/admin/customers", "admin-customers.html", "admin-customers.js"],
+];
+
+test("every admin document and module is explicitly published and served", () => {
+  const files = JSON.parse(read("build.mjs").match(/const files = (\[[\s\S]*?\]);/)[1].replace(/,\s*]/, "]"));
+  const publicPaths = JSON.parse(read("preview-static.mjs").match(/const publicPaths = new Set\((\[[\s\S]*?\])\)/)[1].replace(/,\s*]/, "]"));
+  const config = JSON.parse(read("vercel.json"));
+  assert.equal(config.cleanUrls, false);
+  assert.equal(config.trailingSlash, false);
+  assert.deepEqual(readdirSync(root).filter(file => /^admin(?:-.*)?\.html$/.test(file)).sort(), adminPages.map(([, file]) => file).sort());
+  for (const [route, document, script] of adminPages) {
+    assert.ok(config.rewrites.some(rule => rule.source === route && rule.destination === `/${document}`), route);
+    assert.ok(read("server.mjs").includes(`"${route}": "${document}"`), `local route ${route}`);
+    assert.ok(publicPaths.includes(route), route);
+    assert.ok(isPublicPreviewPath(route), route);
+    for (const file of [document, script, "admin-shell.js"]) {
+      assert.ok(files.includes(file), `build list ${file}`);
+      assert.ok(publicPaths.includes(`/${file}`), `preview list ${file}`);
+      assert.ok(isPublicPreviewPath(`/${file}`), file);
+      assert.equal(read(`dist/${file}`), read(file), `built ${file}`);
+    }
+  }
+  assert.equal(isPublicPreviewPath("/admin-auth.mjs"), false);
+  assert.equal(isPublicPreviewPath("/admin.js"), false);
+});
+
+test("admin documents wait for authentication and load only their task module", () => {
+  for (const [, document, script] of adminPages) {
+    const page = read(document);
+    assert.match(page, /id="login-layer" hidden/);
+    assert.match(page, /id="admin-shell" hidden/);
+    assert.equal((page.match(/data-admin-view=/g) || []).length, 1);
+    assert.ok(page.includes(`<script type="module" src="/${script}">`));
+    assert.match(read(script), /from "\.\/admin-shell\.js"/);
+    assert.doesNotMatch(page, /data-view=|src="admin\.js"|(?:src|href)="assets\//);
+  }
+  const shell = read("admin-shell.js");
+  assert.match(shell, /location\.replace\(legacyPage/);
+  assert.match(shell, /beforeunload/);
+  assert.doesNotMatch(shell, /setAdminView|document\.addEventListener\("click"|\/api\/admin\//);
+  for (const script of ["admin-product.js", "admin-products.js", "admin-categories.js", "admin-customers.js"]) {
+    assert.doesNotMatch(read(script), /loadStats|\/api\/admin\/stats|showLogin/);
+  }
+});
+
 test("production output is complete and excludes unused media", () => {
   for (const file of [
     "index.html",
@@ -439,7 +491,16 @@ test("production output is complete and excludes unused media", () => {
     "storefront-ui.js",
     "admin.html",
     "admin.css",
-    "admin.js",
+    "admin-categories.html",
+    "admin-products.html",
+    "admin-product.html",
+    "admin-customers.html",
+    "admin-shell.js",
+    "admin-stats.js",
+    "admin-categories.js",
+    "admin-products.js",
+    "admin-product.js",
+    "admin-customers.js",
   ]) {
     assert.ok(existsSync(join(root, "dist", file)), `missing dist/${file}`);
   }
@@ -499,7 +560,7 @@ test("a discounted price is rounded to whole thousands and never falls below the
 
   // The storefront and the admin panel repeat this formula; they must agree.
   assert.match(read("script.js"), /finalPrice/);
-  assert.match(read("admin.js"), /const effectivePrice = /);
+  assert.match(read("admin-shell.js"), /const effectivePrice = /);
 });
 
 test("an edit without a new photo keeps the stored image and rejects a bad discount", async () => {
@@ -624,8 +685,8 @@ test("statistics survive a missing order history", async () => {
 });
 
 test("the admin panel exposes adding, editing, discounts, and statistics", () => {
-  const adminHtml = read("admin.html");
-  const adminScript = read("admin.js");
+  const adminHtml = read("admin-product.html");
+  const adminScript = read("admin-product.js");
   const adminCss = read("admin.css");
 
   // Add and edit share one form; the heading and button switch mode.
@@ -642,15 +703,87 @@ test("the admin panel exposes adding, editing, discounts, and statistics", () =>
   assert.match(adminCss, /\.price-preview \{/);
 
   // Visibility toggle instead of deleting seasonal stock.
-  assert.match(adminScript, /data-toggle-product/);
-  assert.match(adminScript, /JSON\.stringify\(\{ active: !product\.active \}\)/);
+  assert.match(read("admin-products.js"), /data-toggle-product/);
+  assert.match(read("admin-products.js"), /JSON\.stringify\(\{ active: !product\.active \}\)/);
 
   // Statistics block with its own endpoint.
-  assert.match(adminHtml, /id="stats-body"/);
-  assert.match(adminHtml, /id="stats-refresh"/);
-  assert.match(adminScript, /\/api\/admin\/stats/);
+  assert.match(read("admin.html"), /id="stats-body"/);
+  assert.match(read("admin.html"), /id="stats-refresh"/);
+  assert.match(read("admin-stats.js"), /\/api\/admin\/stats/);
   assert.match(adminCss, /\.stat-tile \{/);
   assert.match(read("api/admin/stats.mjs"), /requireAdmin/);
+
+  // Customer list: its own admin-only endpoint, opened from the menu.
+  assert.match(read("admin-shell.js"), /data-view="customers"/);
+  assert.match(read("admin-customers.html"), /id="admin-customer-list"/);
+  assert.match(read("admin-customers.html"), /id="customer-search"/);
+  assert.match(read("admin-customers.js"), /\/api\/admin\/customers/);
+  assert.match(adminCss, /\.admin-customer \{/);
+  assert.match(read("api/admin/customers.mjs"), /requireAdmin/);
+  // Nothing is written from this section, so the panel never asks for one.
+  assert.doesNotMatch(read("admin-customers.js"), /customers.*method: "(POST|PATCH|DELETE)"/);
+});
+
+test("the customer list joins every order to the person who placed it", async () => {
+  // Newest first, the way `order=created_at.desc` answers.
+  const users = [
+    { id: "tg:7", phone: "998911112233", full_name: "Bekzod Aliyev", telegram_chat_id: "7", created_at: "2026-06-01T10:00:00Z", last_login_at: "2026-06-02T10:00:00Z" },
+    { id: "tg:6", phone: "998901234567", full_name: "Azizbek ikkinchi akkaunt", telegram_chat_id: "6", created_at: "2026-05-01T10:00:00Z", last_login_at: "2026-05-02T10:00:00Z" },
+    { id: "tg:5", phone: "+998 90 123 45 67", full_name: "Azizbek Karimov", telegram_chat_id: "5", created_at: "2026-03-01T10:00:00Z", last_login_at: "2026-09-01T10:00:00Z" },
+  ];
+  const orders = [
+    { id: "NS-1", created_at: "2026-09-05T09:00:00Z", customer_phone: "+998 90 123 45 67", user_id: "tg:5", items: [], total: 500000 },
+    // Placed before that customer ever signed in: only the number identifies them.
+    { id: "NS-2", created_at: "2026-02-01T09:00:00Z", customer_phone: "998901234567", user_id: null, items: [], total: 300000 },
+    { id: "NS-3", created_at: "2026-06-10T09:00:00Z", customer_phone: "998911112233", user_id: "tg:7", items: [], total: 200000 },
+    { id: "NS-4", created_at: "2026-07-10T09:00:00Z", customer_phone: "998933334455", user_id: null, items: [], total: 100000 },
+  ];
+
+  const { customers, source, ordersAvailable } = await withStubbedFetch(
+    async (url) =>
+      new Response(JSON.stringify(String(url).includes("/rest/v1/orders") ? orders : users), { status: 200 }),
+    () => listCustomers(supabaseEnvironment),
+  );
+
+  assert.equal(source, "users");
+  assert.equal(ordersAvailable, true);
+  assert.deepEqual(customers.map((customer) => customer.id), ["tg:5", "tg:7", "tg:6"], "most recent activity first");
+
+  const [azizbek, bekzod, second] = customers;
+  assert.equal(azizbek.phone, "998901234567", "every spelling of the number is stored the same way");
+  assert.equal(azizbek.orders.count, 2, "the order placed before signing in still belongs to him");
+  assert.equal(azizbek.orders.total, 800000);
+  assert.equal(azizbek.orders.lastAt, "2026-09-05T09:00:00Z");
+  assert.equal(bekzod.orders.count, 1);
+  // One number, two Telegram accounts: the older account keeps the history, so
+  // the same 300 000 so'm is never counted against both.
+  assert.equal(second.orders.count, 0);
+  assert.equal(
+    customers.reduce((sum, customer) => sum + customer.orders.total, 0),
+    1000000,
+    "the order from a number with no account is left out rather than double counted",
+  );
+});
+
+test("customers survive a store with no database and an unreachable order table", async () => {
+  const users = [{ id: "tg:5", phone: "998901234567", full_name: "Azizbek Karimov", created_at: "2026-03-01T10:00:00Z", last_login_at: "2026-09-01T10:00:00Z" }];
+
+  // The users table answers; the orders table does not.
+  const partial = await withStubbedFetch(
+    async (url) =>
+      String(url).includes("/rest/v1/orders")
+        ? new Response("no such table", { status: 404 })
+        : new Response(JSON.stringify(users), { status: 200 }),
+    () => listCustomers(supabaseEnvironment),
+  );
+  assert.equal(partial.ordersAvailable, false, "the panel is told the purchase totals are missing");
+  assert.equal(partial.customers.length, 1, "the customer is still listed");
+  assert.equal(partial.customers[0].orders.total, 0);
+
+  // No database at all: the orders on disk are the only record of who bought.
+  const { customers, source } = await listCustomers({});
+  assert.equal(source, "orders");
+  assert.ok(Array.isArray(customers));
 });
 
 test("the storefront prints the discounted price and charges it", () => {
@@ -994,10 +1127,10 @@ test("the shop renders a gallery and the admin panel manages one", () => {
   assert.match(script, /data-thumb=/);
   assert.match(shopCss, /\.pdp-thumb \{/);
 
-  assert.match(read("admin.html"), /name="image-file"[^>]*multiple/);
-  assert.match(read("admin.html"), /id="image-gallery"/);
-  assert.match(read("admin.js"), /const renderImageGallery = /);
-  assert.match(read("admin.js"), /data-make-main/);
+  assert.match(read("admin-product.html"), /name="image-file"[^>]*multiple/);
+  assert.match(read("admin-product.html"), /id="image-gallery"/);
+  assert.match(read("admin-product.js"), /const renderImageGallery = /);
+  assert.match(read("admin-product.js"), /data-make-main/);
   assert.match(read("admin.css"), /\.image-tile \{/);
 
   // A single photo saved before the gallery existed still has to render.
@@ -1005,8 +1138,8 @@ test("the shop renders a gallery and the admin panel manages one", () => {
 });
 
 test("footwear is sized in EU numbers and clothing in letters", () => {
-  const adminScript = read("admin.js");
-  const adminHtml = read("admin.html");
+  const adminScript = read("admin-product.js");
+  const adminHtml = read("admin-product.html");
 
   // Both sets exist, and the size set now follows the category record rather
   // than a hard-coded list of names.
@@ -1036,15 +1169,15 @@ test("footwear is sized in EU numbers and clothing in letters", () => {
 });
 
 test("categories are managed from their own admin section", async () => {
-  const adminHtml = read("admin.html");
-  const adminScript = read("admin.js");
+  const adminHtml = read("admin-categories.html");
+  const adminScript = read("admin-categories.js");
 
-  // The panel has a section of its own, between the statistics and the form.
+  // Each task lives in its own document.
   assert.match(adminHtml, /<section class="category-section"/);
   assert.match(adminHtml, /id="category-list"/);
-  assert.match(adminHtml, /<div><span>02<\/span><h2 id="category-title">KATEGORIYALAR<\/h2><\/div>/);
-  assert.match(adminHtml, /<div><span>03<\/span><h2 id="product-form-title">/);
-  assert.match(adminHtml, /<div><span>04<\/span><h2 id="product-list-title">/);
+  assert.match(adminHtml, /data-admin-view="categories"/);
+  assert.match(read("admin-product.html"), /data-admin-view="editor"/);
+  assert.match(read("admin-products.html"), /data-admin-view="products"/);
   assert.match(adminScript, /const renderCategories = /);
   assert.match(adminScript, /\/api\/admin\/categories/);
   assert.match(read("admin.css"), /\.admin-category \{/);
@@ -1174,6 +1307,8 @@ test("the Telegram webhook refuses anything without the shared secret", () => {
       TELEGRAM_BOT_TOKEN: "123:abc",
       SUPABASE_URL: "https://x.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "key",
+      TELEGRAM_WEBHOOK_SECRET: "a-webhook-secret-value",
+      SESSION_SECRET: "a-session-secret-that-is-long-enough",
     }),
     true,
   );
@@ -1197,7 +1332,7 @@ test("the Telegram flow is stateless and only accepts your own contact", () => {
 
   // The pages offer whichever methods the server reports.
   assert.match(read("auth-routes.mjs"), /telegramEnabled/);
-  assert.match(read("admin.js"), /telegramSignin/);
+  assert.match(read("admin-shell.js"), /telegramSignin/);
   assert.match(script, /data-telegram-signin/);
 });
 

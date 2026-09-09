@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-09-08T13:38:43.444Z",
+  "productionWrites": 0,
+  "results": [
+    {
+      "width": 360,
+      "status": "passed",
+      "interceptedWrites": 12,
+      "checks": "views, drawer, keyboard, tables, filters, edit, discounts, categories CRUD/order/status/rename, product CRUD/status, variants, gallery, validation, error recovery, unsaved edits"
+    },
+    {
+      "width": 390,
+      "status": "passed",
+      "interceptedWrites": 12,
+      "checks": "views, drawer, keyboard, tables, filters, edit, discounts, categories CRUD/order/status/rename, product CRUD/status, variants, gallery, validation, error recovery, unsaved edits"
+    },
+    {
+      "width": 768,
+      "status": "passed",
+      "interceptedWrites": 12,
+      "checks": "views, drawer, keyboard, tables, filters, edit, discounts, categories CRUD/order/status/rename, product CRUD/status, variants, gallery, validation, error recovery, unsaved edits"
+    },
+    {
+      "width": 1024,
+      "status": "passed",
+      "interceptedWrites": 12,
+      "checks": "views, drawer, keyboard, tables, filters, edit, discounts, categories CRUD/order/status/rename, product CRUD/status, variants, gallery, validation, error recovery, unsaved edits"
+    },
+    {
+      "width": 1440,
+      "status": "passed",
+      "interceptedWrites": 12,
+      "checks": "views, drawer, keyboard, tables, filters, edit, discounts, categories CRUD/order/status/rename, product CRUD/status, variants, gallery, validation, error recovery, unsaved edits"
+    },
+    {
+      "scenario": "upload-boundaries-drafts-session-expiry",
+      "status": "passed"
+    },
+    {
+      "scenario": "visitor",
+      "status": "passed"
+    },
+    {
+      "scenario": "customer",
+      "status": "passed"
+    },
+    {
+      "scenario": "password",
+      "status": "passed"
+    },
+    {
+      "scenario": "catalog-error",
+      "status": "passed"
+    },
+    {
+      "scenario": "empty",
+      "status": "passed"
+    },
+    {
+      "scenario": "stats-error",
+      "status": "passed"
+    },
+    {
+      "scenario": "stats-unavailable",
+      "status": "passed"
+    },
+    {
+      "scenario": "category-error",
+      "status": "passed"
+    }
+  ]
+}

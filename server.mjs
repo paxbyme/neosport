@@ -2,6 +2,7 @@ import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import adminCategoriesHandler from "./api/admin/categories.mjs";
+import adminCustomersHandler from "./api/admin/customers.mjs";
 import adminProductsHandler from "./api/admin/products.mjs";
 import adminStatsHandler from "./api/admin/stats.mjs";
 import authHandler from "./api/auth.mjs";
@@ -9,6 +10,7 @@ import orderHandler from "./api/order.mjs";
 import ordersHandler from "./api/orders.mjs";
 import productsHandler from "./api/products.mjs";
 import telegramWebhookHandler from "./api/telegram/webhook.mjs";
+import { isPublicPreviewPath } from "./preview-static.mjs";
 
 for (const filename of [".env.local", ".env"]) {
   if (!existsSync(filename)) continue;
@@ -59,12 +61,15 @@ const readJsonBody = (request) =>
   });
 
 createServer(async (request, response) => {
-  const pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname);
+  let pathname;
+  try { pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname); }
+  catch { response.writeHead(400); response.end("Noto‘g‘ri manzil."); return; }
   const apiHandler = {
     "/api/order": orderHandler,
     "/api/products": productsHandler,
     "/api/orders": ordersHandler,
     "/api/admin/categories": adminCategoriesHandler,
+    "/api/admin/customers": adminCustomersHandler,
     "/api/admin/products": adminProductsHandler,
     "/api/admin/stats": adminStatsHandler,
     "/api/telegram/webhook": telegramWebhookHandler,
@@ -83,10 +88,19 @@ createServer(async (request, response) => {
     return;
   }
 
+  if (!isPublicPreviewPath(pathname)) {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+    response.end("Sahifa topilmadi.");
+    return;
+  }
   const safePath = normalize(pathname).replace(/^(\.\.(\/|\\|$))+/, "");
   const pageFile = {
     "/": "index.html",
     "/admin": "admin.html",
+    "/admin/categories": "admin-categories.html",
+    "/admin/products": "admin-products.html",
+    "/admin/product": "admin-product.html",
+    "/admin/customers": "admin-customers.html",
     "/shop": "shop.html",
   }[safePath];
   let filePath = join(root, pageFile || safePath);

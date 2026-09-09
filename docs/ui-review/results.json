@@ -32,5 +32,9 @@
   {
     "status": "passed",
     "checks": "catalog loading, error, retry, empty, saved cart retained after fetch failure, long cart, responsive cart transitions, short viewport input focus, 320px single column, isolated nine-product grid"
+  },
+  {
+    "status": "passed",
+    "checks": "authenticated name/phone prefill, order history and empty history, customer has no admin link, order history cleared on sign-out, account switch and back navigation"
   }
 ]

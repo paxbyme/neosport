@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080a08" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>NeoSport — Statistika</title>
+    <title>NeoSport — Kategoriyalar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,21 +16,42 @@
     <link rel="stylesheet" href="/admin.css" />
     <link rel="stylesheet" href="/telegram-login.css" />
   </head>
-  <body data-admin-page="stats">
+  <body data-admin-page="categories">
     <a class="skip-link" href="#admin-panel">Asosiy qismga o‘tish</a>
     <header class="admin-header"></header>
     <div class="admin-shell" id="admin-shell" hidden>
       <main class="admin-main">
-        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Statistika</h1><p id="admin-view-description">Buyurtmalar va katalog holati.</p></div>
+        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Kategoriyalar</h1><p id="admin-view-description">Yo‘nalishlar, o‘lcham turlari va ko‘rinish tartibi.</p></div>
         <section class="admin-panel" id="admin-panel" hidden>
-        <section class="stats-section" id="stats" data-admin-view="stats" aria-labelledby="stats-title">
+        <section class="category-section" id="categories" data-admin-view="categories" aria-labelledby="category-title">
           <div class="form-heading">
-            <div><h2 id="stats-title">Buyurtmalar va katalog</h2></div>
-            <button class="stats-refresh" id="stats-refresh" type="button">Yangilash</button>
+            <div><h2 id="category-title">Kategoriyalar</h2></div>
+            <p id="category-count" role="status">Yuklanmoqda...</p>
           </div>
-          <div class="stats-body" id="stats-body" aria-live="polite">
-            <p class="admin-empty">Statistika yuklanmoqda...</p>
-          </div>
+
+          <form class="category-form" id="category-form">
+            <label class="field">
+              <span>KATEGORIYA NOMI</span>
+              <input type="text" name="name" minlength="2" maxlength="40" placeholder="Masalan, Sport kostyum" required />
+            </label>
+            <label class="field">
+              <span>O‘LCHAM TURI</span>
+              <select name="sizeType">
+                <option value="clothing">Kiyim · S–4XL</option>
+                <option value="shoes">Oyoq kiyim · 36–45</option>
+              </select>
+            </label>
+            <div class="category-form-actions">
+              <button class="save-category-button" id="save-category-button" type="submit">
+                <span>Kategoriya qo‘shish</span><b aria-hidden="true">+</b>
+              </button>
+              <button class="cancel-category-button" id="cancel-category-edit" type="button" hidden>Bekor qilish</button>
+            </div>
+          </form>
+
+          <p class="admin-status" id="category-status" role="status" aria-live="polite"></p>
+          <button class="secondary-button" id="categories-retry" type="button" hidden>Qayta urinish</button>
+          <div class="category-list" id="category-list" aria-live="polite"></div>
         </section>
         </section>
       </main>
@@ -79,6 +100,6 @@
     </div>
 
     <script src="/telegram-login.js"></script>
-    <script type="module" src="/admin-stats.js"></script>
+    <script type="module" src="/admin-categories.js"></script>
   </body>
 </html>

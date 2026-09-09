@@ -10,6 +10,7 @@ import {
 import { registerTelegramUser } from "../../user-service.mjs";
 
 const SITE_NAME = "NeoSport";
+const escapeHtml = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
 const siteUrl = (environment = process.env) =>
   String(environment.SITE_URL || "https://neosport-nu.vercel.app").replace(/\/$/, "");
@@ -31,8 +32,7 @@ const askForContact = (chatId) =>
   );
 
 export default async function handler(request, response) {
-  // Telegram retries on any non-2xx, so this endpoint answers 200 for every
-  // update it understands and only refuses a request with a bad secret.
+  // Acknowledge irrelevant updates; transient failures stay retryable.
   const done = (status = 200) => {
     response.statusCode = status;
     response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -54,7 +54,8 @@ export default async function handler(request, response) {
   try {
     const message = request.body?.message;
     const chatId = message?.chat?.id;
-    if (!chatId) return done();
+    // Contacts are identity proof only in a private conversation with their owner.
+    if (message?.chat?.type !== "private" || !message.from?.id || String(chatId) !== String(message.from.id) || message.from.is_bot) return done();
 
     // Step one: the deep link arrives as "/start <token>". The chat is written
     // onto the token row, because the contact below lands in a separate
@@ -65,7 +66,10 @@ export default async function handler(request, response) {
         await reply(chatId, "Bu kirish havolasi eskirgan. Saytga qaytib, qaytadan urinib ko‘ring.");
         return done();
       }
-      await attachChatToToken(startToken, chatId);
+      if (!(await attachChatToToken(startToken, chatId))) {
+        await reply(chatId, "Bu kirish havolasi ishlatilgan yoki eskirgan. Saytdan qaytadan boshlang.");
+        return done();
+      }
       await askForContact(chatId);
       return done();
     }
@@ -79,7 +83,7 @@ export default async function handler(request, response) {
     const contact = message.contact;
     if (contact) {
       // Sharing somebody else's contact card must not sign you in as them.
-      if (String(contact.user_id || "") !== String(message.from?.id || "")) {
+      if (!contact.user_id || String(contact.user_id) !== String(message.from?.id)) {
         await reply(chatId, "Iltimos, o‘zingizning raqamingizni ulashing.");
         return done();
       }
@@ -91,7 +95,10 @@ export default async function handler(request, response) {
       }
 
       const name = [contact.first_name, contact.last_name].filter(Boolean).join(" ");
-      await markTokenVerified(pending.token, { chatId, phone: contact.phone_number, name });
+      if (!(await markTokenVerified(pending.token, { chatId, phone: contact.phone_number, name }))) {
+        await reply(chatId, "Kirish muddati tugagan. Saytdan qaytadan boshlang.");
+        return done();
+      }
 
       // The contact is the sign-up: this is the first moment the number is
       // proven, so the customer record is written here rather than when the
@@ -105,10 +112,10 @@ export default async function handler(request, response) {
       }
 
       const greeting = registration?.isNew
-        ? `✅ Ro‘yxatdan o‘tdingiz${name ? `, ${name}` : ""}!`
-        : `✅ Tasdiqlandi. Xush kelibsiz${name ? `, ${name}` : ""}!`;
+        ? `✅ Ro‘yxatdan o‘tdingiz${name ? `, ${escapeHtml(name)}` : ""}!`
+        : `✅ Tasdiqlandi. Xush kelibsiz${name ? `, ${escapeHtml(name)}` : ""}!`;
 
-      await reply(chatId, `${greeting} Saytga qayting — kirish avtomatik yakunlanadi.\n\n${siteUrl()}`, {
+      await reply(chatId, `${greeting}\n\nKirishni boshlagan brauzer sahifasiga qayting — kirish avtomatik yakunlanadi.\n\n${escapeHtml(siteUrl())}`, {
         reply_markup: { remove_keyboard: true },
       });
       return done();
@@ -116,8 +123,8 @@ export default async function handler(request, response) {
 
     return done();
   } catch (error) {
-    // Still 200: retrying would replay the same failing update forever.
+    // A transient database/Telegram failure must remain retryable by Telegram.
     console.error("Telegram webhook failed", error);
-    return done();
+    return done(503);
   }
 }

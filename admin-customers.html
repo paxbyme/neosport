@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080a08" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>NeoSport — Statistika</title>
+    <title>NeoSport — Mijozlar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,21 +16,32 @@
     <link rel="stylesheet" href="/admin.css" />
     <link rel="stylesheet" href="/telegram-login.css" />
   </head>
-  <body data-admin-page="stats">
+  <body data-admin-page="customers">
     <a class="skip-link" href="#admin-panel">Asosiy qismga o‘tish</a>
     <header class="admin-header"></header>
     <div class="admin-shell" id="admin-shell" hidden>
       <main class="admin-main">
-        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Statistika</h1><p id="admin-view-description">Buyurtmalar va katalog holati.</p></div>
+        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Mijozlar</h1><p id="admin-view-description">Ro‘yxatdan o‘tgan mijozlar va ularning xaridlari.</p></div>
         <section class="admin-panel" id="admin-panel" hidden>
-        <section class="stats-section" id="stats" data-admin-view="stats" aria-labelledby="stats-title">
+        <section class="customer-section" id="customers" data-admin-view="customers" aria-labelledby="customer-title">
           <div class="form-heading">
-            <div><h2 id="stats-title">Buyurtmalar va katalog</h2></div>
-            <button class="stats-refresh" id="stats-refresh" type="button">Yangilash</button>
+            <div><h2 id="customer-title">Mijozlar</h2></div>
+            <p id="customer-count" role="status">Yuklanmoqda...</p>
           </div>
-          <div class="stats-body" id="stats-body" aria-live="polite">
-            <p class="admin-empty">Statistika yuklanmoqda...</p>
+          <div class="admin-catalog-toolbar">
+            <label class="field search-field"><span>Qidirish</span><input id="customer-search" type="search" placeholder="Ism yoki telefon" autocomplete="off" disabled /></label>
+            <label class="field"><span>Tartib</span><select id="customer-sort" disabled>
+              <option value="recent">Oxirgi harakat</option>
+              <option value="spent">Ko&#8216;p xarid qilgan</option>
+              <option value="orders">Ko&#8216;p buyurtma bergan</option>
+              <option value="new">Yangi ro&#8216;yxatdan o&#8216;tgan</option>
+            </select></label>
+            <button class="secondary-button" id="customer-reset-filters" type="button" hidden>Tozalash</button>
           </div>
+          <p class="admin-hint" id="customer-hint" hidden></p>
+          <p class="admin-status" id="customer-status" role="status" aria-live="polite"></p>
+          <button class="secondary-button" id="customers-retry" type="button" hidden>Qayta urinish</button>
+          <div class="admin-customer-list" id="admin-customer-list" aria-live="polite"></div>
         </section>
         </section>
       </main>
@@ -79,6 +90,6 @@
     </div>
 
     <script src="/telegram-login.js"></script>
-    <script type="module" src="/admin-stats.js"></script>
+    <script type="module" src="/admin-customers.js"></script>
   </body>
 </html>

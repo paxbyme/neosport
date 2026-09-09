@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#090a08" />
+    <meta name="theme-color" content="#11140f" />
     <meta
       name="description"
       content="NeoSport — Namangandagi erkaklar sport kiyimlari do‘koni. Kiyim rangini va o‘lchamini tanlang, savatchaga qo‘shing va buyurtmani onlayn yuboring."
@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="landing.css" />
     <link rel="stylesheet" href="shop.css" />
+    <link rel="stylesheet" href="telegram-login.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -61,19 +62,6 @@
   </head>
   <body class="landing">
     <a class="skip-link" href="#main">Asosiy qismga o‘tish</a>
-
-    <div class="topline">
-      <p>NAMANGAN · ERKAKLAR SPORT KIYIMLARI</p>
-      <a
-        href="https://www.instagram.com/neosport_namangan/"
-        target="_blank"
-        rel="noopener noreferrer"
-        data-analytics-location="hero"
-        data-analytics-destination="instagram"
-      >
-        INSTAGRAMDA YOZING <span aria-hidden="true">↗</span>
-      </a>
-    </div>
 
     <header class="site-header" id="site-header">
       <a class="brand" href="#top" aria-label="NeoSport bosh sahifasi">
@@ -147,7 +135,7 @@
 
         <div class="catalog-grid home-products" id="catalog-grid" aria-busy="true"></div>
         <div class="row-empty" id="catalog-empty" hidden>
-          <p>Katalog yangilanmoqda. Yangi kelgan modellar tez orada shu yerda paydo bo‘ladi.</p>
+          <p>Hozircha katalogda mahsulot yo‘q.</p>
           <a
             class="button button-ghost"
             href="https://www.instagram.com/neosport_namangan/"
@@ -287,7 +275,7 @@
 
       <section class="social" aria-labelledby="social-title">
         <h2 id="social-title" class="sr-only">NeoSport Instagramda</h2>
-        <p>O‘lcham, narx, mavjudlik va yangi modellar haqida Instagramda yozing — tez javob beramiz.</p>
+        <p>O‘lcham, narx, mavjudlik va yangi modellar haqida Instagramda yozing.</p>
         <a
           class="social-handle"
           href="https://www.instagram.com/neosport_namangan/"
@@ -299,17 +287,6 @@
       </section>
     </main>
 
-
-    <nav class="mobile-actions" aria-label="Tezkor amallar">
-      <a href="/shop">Do‘kon</a>
-      <a
-        href="https://www.instagram.com/neosport_namangan/"
-        target="_blank"
-        rel="noopener noreferrer"
-        data-analytics-location="mobile"
-        data-analytics-destination="instagram"
-      >Instagram <span aria-hidden="true">↗</span></a>
-    </nav>
 
     <footer class="site-footer">
       <a class="brand footer-brand" href="#top" aria-label="NeoSport bosh sahifasi">
@@ -341,6 +318,7 @@
 
     <script defer src="/_vercel/insights/script.js"></script>
     <script src="storefront-ui.js"></script>
+    <script src="telegram-login.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

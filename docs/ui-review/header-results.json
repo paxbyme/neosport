@@ -1,0 +1,62 @@
+[
+  {
+    "width": 360,
+    "signed": false,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 360,
+    "signed": true,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 390,
+    "signed": false,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 390,
+    "signed": true,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 768,
+    "signed": false,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 768,
+    "signed": true,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 1024,
+    "signed": false,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 1024,
+    "signed": true,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 1440,
+    "signed": false,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  },
+  {
+    "width": 1440,
+    "signed": true,
+    "status": "passed",
+    "checks": "banner removed, header at top, dark theme, no overlap/overflow, keyboard and mobile navigation"
+  }
+]

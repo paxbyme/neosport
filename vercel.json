@@ -8,6 +8,10 @@
   "rewrites": [
     { "source": "/api/auth/(.*)", "destination": "/api/auth?action=$1" },
     { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin/categories", "destination": "/admin-categories.html" },
+    { "source": "/admin/products", "destination": "/admin-products.html" },
+    { "source": "/admin/product", "destination": "/admin-product.html" },
+    { "source": "/admin/customers", "destination": "/admin-customers.html" },
     { "source": "/shop", "destination": "/shop.html" }
   ]
 }

@@ -6,7 +6,7 @@ Katalog 2026-09-07 da bo‘shatildi: saytda hardcoded mahsulot yo‘q, hamma nar
 
 | Imkoniyat | Qayerda |
 | --- | --- |
-| Parol bilan kirish | `admin-auth.mjs`, `admin.js` |
+| Parol bilan kirish | `admin-auth.mjs`, `admin-shell.js` |
 | Mahsulot qo‘shish | `POST /api/admin/products` |
 | **Mahsulotni tahrirlash** | `PATCH /api/admin/products?id=` → `updateProduct()` |
 | **Faol / nofaol qilish** | `PATCH` bilan `{ "active": false }` → `setProductActive()` |
@@ -18,13 +18,15 @@ Katalog 2026-09-07 da bo‘shatildi: saytda hardcoded mahsulot yo‘q, hamma nar
 | **Admin huquqi email bo‘yicha** | `ADMIN_EMAILS` → rol har so‘rovda qayta hisoblanadi |
 | **Admin API'da rate limit** | `rate-limit.mjs` → 15 daqiqada 10 urinish |
 | **Mijoz buyurtmalar tarixi** | `GET /api/orders` → faqat o‘z buyurtmalari |
+| **Mijozlar ro‘yxati** | `GET /api/admin/customers` → `customer-service.mjs` (faqat o‘qish) |
+| **Har bir vazifa — alohida sahifa** | `/admin`, `/admin/categories`, `/admin/products`, `/admin/product`, `/admin/customers`; umumiy qism `admin-shell.js` da |
 | **Rasm yuklash va optimizatsiya** | `sharp` → 1280px, WebP; Supabase Storage `product-images` |
 | **Galereya (10 tagacha rasm)** | `images` jsonb; asosiy rasmni tanlash, tartibni o‘zgartirish |
 | **Rasm hayot sikli** | o‘chirilgan/almashtirilgan rasm Storage’dan ham o‘chadi |
 
 ### Chegirma qanday ishlaydi
 
-Admin foizni kiritadi (0–90). Yakuniy narx `price × (100 − foiz) / 100` bo‘lib, eng yaqin **1000 so‘mga yaxlitlanadi** — 422 500 emas, 423 000 ko‘rinadi. Bu bitta joyda, `product-service.mjs` dagi `effectivePrice()` da hisoblanadi; `admin.js` faqat formada oldindan ko‘rsatish uchun shu formulani takrorlaydi, haqiqiy narxni doim server beradi.
+Admin foizni kiritadi (0–90). Yakuniy narx `price × (100 − foiz) / 100` bo‘lib, eng yaqin **1000 so‘mga yaxlitlanadi** — 422 500 emas, 423 000 ko‘rinadi. Bu bitta joyda, `product-service.mjs` dagi `effectivePrice()` da hisoblanadi; `admin-shell.js` faqat formada oldindan ko‘rsatish uchun shu formulani takrorlaydi, haqiqiy narxni doim server beradi.
 
 Chegirma butun zanjir bo‘ylab o‘tadi: do‘kon kartochkasi va mahsulot oynasida chegirmali narx, ustidan chizilgan eski narx va `−N%` belgisi ko‘rinadi; savatcha jami chegirmali narx bo‘yicha hisoblanadi; `/api/order` mijoz yuborgan narxga emas, serverdagi `finalPrice` ga ishonadi; Telegram xabarida chegirma alohida qatorda yoziladi.
 

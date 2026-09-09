@@ -1,5 +1,5 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
-import { AuthError, normalizePhone } from "./auth-session.mjs";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { AuthError, normalizePhone, parseCookies, serializeCookie } from "./auth-session.mjs";
 import { supabaseConfig, supabaseRequest } from "./supabase.mjs";
 import { telegramUserId } from "./user-service.mjs";
 
@@ -15,7 +15,29 @@ const botToken = (environment) => {
 };
 
 export const isTelegramAuthConfigured = (environment = process.env) =>
-  Boolean(environment.TELEGRAM_BOT_TOKEN) && Boolean(supabaseConfig(environment));
+  Boolean(environment.TELEGRAM_BOT_TOKEN && environment.TELEGRAM_BOT_TOKEN !== "[SENSITIVE]") &&
+  /^[A-Za-z0-9_-]{16,256}$/.test(environment.TELEGRAM_WEBHOOK_SECRET || "") &&
+  String(environment.SESSION_SECRET || "").length >= 32 &&
+  Boolean(supabaseConfig(environment));
+
+const validToken = (token) => /^[A-Za-z0-9_-]{32}$/.test(String(token || ""));
+const validChat = (chatId) => /^[1-9]\d{0,15}$/.test(String(chatId || ""));
+const freshFilter = () => `created_at=gt.${encodeURIComponent(new Date(Date.now() - LOGIN_TOKEN_MAX_AGE_MS).toISOString())}`;
+const isFresh = (row) => Number.isFinite(Date.parse(row?.created_at)) && Date.parse(row.created_at) + LOGIN_TOKEN_MAX_AGE_MS > Date.now();
+
+// The deep-link token alone cannot be copied into another browser's cookie.
+// Domain-separated signing keeps this proof distinct from a session signature.
+const browserProof = (token, environment) => createHmac("sha256", environment.SESSION_SECRET).update(`telegram-login:${token}`).digest("base64url");
+export const createTelegramCookie = (token, { request, environment = process.env } = {}) => {
+  if (!validToken(token) || String(environment.SESSION_SECRET || "").length < 32) throw new AuthError("Kirish sessiyasi sozlanmagan.", 503);
+  return serializeCookie(TELEGRAM_COOKIE, `${token}.${browserProof(token, environment)}`, { maxAge: LOGIN_TOKEN_MAX_AGE_MS / 1000, request, environment });
+};
+export const readTelegramToken = (request, environment = process.env) => {
+  const [token, supplied, extra] = String(parseCookies(request?.headers?.cookie)[TELEGRAM_COOKIE] || "").split(".");
+  if (!validToken(token) || !supplied || extra || String(environment.SESSION_SECRET || "").length < 32) return null;
+  const expected = Buffer.from(browserProof(token, environment)), actual = Buffer.from(supplied);
+  return expected.length === actual.length && timingSafeEqual(expected, actual) ? token : null;
+};
 
 export const callTelegram = async (method, body, environment = process.env) => {
   // Resolved before the try, so a missing token reads as "not configured"
@@ -72,6 +94,7 @@ export const createLoginToken = async (nextPath, environment = process.env) => {
 };
 
 const readToken = async (token, environment) => {
+  if (!validToken(token)) return null;
   const config = tokensConfig(environment);
   const rows = await supabaseRequest(
     config,
@@ -80,8 +103,22 @@ const readToken = async (token, environment) => {
   );
   const row = rows?.[0];
   if (!row) return null;
-  if (Date.parse(row.created_at) + LOGIN_TOKEN_MAX_AGE_MS < Date.now()) return null;
+  if (!isFresh(row)) return null;
   return row;
+};
+
+export const loginTokenStatus = async (token, environment = process.env) => {
+  if (!token) return { state: "idle" };
+  const row = await readToken(token, environment);
+  if (!row || !["pending", "verified", "used"].includes(row.status)) return { state: "expired" };
+  return { state: row.status, expiresAt: Date.parse(row.created_at) + LOGIN_TOKEN_MAX_AGE_MS };
+};
+
+export const cancelLoginToken = async (token, environment = process.env) => {
+  if (!validToken(token)) return;
+  await supabaseRequest(tokensConfig(environment), `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=in.(pending,verified)`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" },
+  });
 };
 
 export const findPendingToken = async (token, environment = process.env) => {
@@ -92,31 +129,35 @@ export const findPendingToken = async (token, environment = process.env) => {
 /** Records which chat opened the deep link, so the contact that arrives in a
  * later webhook call — possibly on a different instance — can be matched to it. */
 export const attachChatToToken = async (token, chatId, environment = process.env) => {
+  if (!validToken(token) || !validChat(chatId)) return false;
   const config = tokensConfig(environment);
-  await supabaseRequest(config, `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=eq.pending`, {
+  const rows = await supabaseRequest(config, `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=eq.pending&${freshFilter()}&or=(chat_id.is.null,chat_id.eq.${chatId})`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify({ chat_id: String(chatId) }),
   });
+  return Boolean(rows?.length);
 };
 
 export const findPendingTokenForChat = async (chatId, environment = process.env) => {
+  if (!validChat(chatId)) return null;
   const config = tokensConfig(environment);
   const rows = await supabaseRequest(
     config,
-    `/rest/v1/login_tokens?select=*&chat_id=eq.${encodeURIComponent(String(chatId))}&status=eq.pending&order=created_at.desc&limit=1`,
+    `/rest/v1/login_tokens?select=*&chat_id=eq.${encodeURIComponent(String(chatId))}&status=eq.pending&${freshFilter()}&order=created_at.desc&limit=1`,
     { headers: { Accept: "application/json" } },
   );
   const row = rows?.[0];
-  if (!row || Date.parse(row.created_at) + LOGIN_TOKEN_MAX_AGE_MS < Date.now()) return null;
+  if (!row || !isFresh(row)) return null;
   return row;
 };
 
 export const markTokenVerified = async (token, { chatId, phone, name }, environment = process.env) => {
+  if (!validToken(token) || !validChat(chatId) || !/^\d{7,15}$/.test(normalizePhone(phone))) return false;
   const config = tokensConfig(environment);
-  await supabaseRequest(config, `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=eq.pending`, {
+  const rows = await supabaseRequest(config, `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=eq.pending&chat_id=eq.${chatId}&${freshFilter()}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify({
       status: "verified",
       chat_id: String(chatId),
@@ -124,6 +165,7 @@ export const markTokenVerified = async (token, { chatId, phone, name }, environm
       full_name: String(name || "").slice(0, 80),
     }),
   });
+  return Boolean(rows?.length);
 };
 
 /**
@@ -135,10 +177,11 @@ export const consumeVerifiedToken = async (token, environment = process.env) => 
   const config = tokensConfig(environment);
   const row = await readToken(token, environment);
   if (!row || row.status !== "verified") return null;
+  if (!validChat(row.chat_id) || !/^\d{7,15}$/.test(normalizePhone(row.phone))) return null;
 
   const rows = await supabaseRequest(
     config,
-    `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=eq.verified`,
+    `/rest/v1/login_tokens?token=eq.${encodeURIComponent(token)}&status=eq.verified&${freshFilter()}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Prefer: "return=representation" },
@@ -165,7 +208,7 @@ export const consumeVerifiedToken = async (token, environment = process.env) => 
 export const verifyWebhookSecret = (request, environment = process.env) => {
   const expected = String(environment.TELEGRAM_WEBHOOK_SECRET || "");
   // Without a configured secret anyone who guesses the URL could forge a login.
-  if (!expected) throw new AuthError("Telegram webhook siri sozlanmagan.", 503);
+  if (!/^[A-Za-z0-9_-]{16,256}$/.test(expected)) throw new AuthError("Telegram webhook siri sozlanmagan.", 503);
 
   const supplied = String(request?.headers?.["x-telegram-bot-api-secret-token"] || "");
   const expectedBuffer = Buffer.from(expected);
