@@ -31,10 +31,16 @@ const client = new pg.Client({
 });
 await client.connect();
 
+const schema = readFileSync("supabase-schema.sql", "utf8");
+// Read out of the schema rather than listed here: a hardcoded list silently
+// stops covering whatever is added to the file next, and then the migration
+// reports success for tables it never checked.
+const expected = [...schema.matchAll(/create table if not exists public\.(\w+)/g)].map((match) => match[1]).sort();
+
 try {
   // The schema is written to be re-runnable, so one transaction is safe.
   await client.query("begin");
-  await client.query(readFileSync("supabase-schema.sql", "utf8"));
+  await client.query(schema);
   await client.query("commit");
   console.log("Sxema qo‘llandi.");
 
@@ -42,9 +48,17 @@ try {
     select table_name, (select count(*) from information_schema.columns c
        where c.table_schema = t.table_schema and c.table_name = t.table_name) as columns
     from information_schema.tables t
-    where table_schema = 'public' and table_name in ('products', 'orders', 'users', 'login_tokens')
-    order by table_name`);
+    where table_schema = 'public' and table_name = any($1)
+    order by table_name`, [expected]);
   for (const row of rows) console.log(`  ${row.table_name}: ${row.columns} ta ustun`);
+
+  // Every table the schema defines has to be there afterwards, or the panel
+  // finds out at runtime with a PGRST205 instead of here.
+  const missing = expected.filter((table) => !rows.some((row) => row.table_name === table));
+  if (missing.length) {
+    console.error(`\nJadval yaratilmadi: ${missing.join(", ")}`);
+    process.exitCode = 1;
+  }
 } catch (error) {
   await client.query("rollback").catch(() => {});
   console.error("Migratsiya bajarilmadi:", error.message);
