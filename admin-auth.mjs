@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { isStoredAdmin } from "./admin-service.mjs";
 import { readSession } from "./auth-session.mjs";
 import { checkRateLimit, clientAddress } from "./rate-limit.mjs";
 
@@ -21,17 +22,33 @@ const passwordMatches = (authorization, expected) => {
 };
 
 /**
- * Admin access comes from a Google session whose email is in ADMIN_EMAILS.
- * ADMIN_PASSWORD stays as a fallback for local work and for the window before
- * Google sign-in is configured; leaving it unset disables that path entirely.
+ * Admin access comes from a session whose email is in ADMIN_EMAILS, whose
+ * phone is in ADMIN_PHONES, or which the panel's own admins list names.
+ *
+ * The environment is checked first and without touching the database, so the
+ * recovery path keeps working when the database does not, and so a request
+ * that is already an admin never pays for the lookup. ADMIN_PASSWORD stays as
+ * a fallback for local work and for the window before sign-in is configured;
+ * leaving it unset disables that path entirely.
  */
-export const requireAdmin = (request, environment = process.env) => {
+export const requireAdmin = async (request, environment = process.env) => {
   const session = readSession(request, environment);
   if (session?.role === "admin") return session;
 
   const password = String(environment.ADMIN_PASSWORD || "");
 
   if (session) {
+    // A database that cannot be reached must not silently demote an admin, so
+    // the failure is reported rather than answered as "not an admin".
+    let granted;
+    try {
+      granted = await isStoredAdmin(session, environment);
+    } catch (error) {
+      console.error("Admin list could not be read", error.message);
+      throw new AdminAuthError("Adminlar ro‘yxatini tekshirib bo‘lmadi. Birozdan keyin urinib ko‘ring.", 503);
+    }
+    if (granted) return { ...session, role: "admin" };
+
     // Signed in, but not as an admin: no point counting this against the
     // brute-force budget, and the message should say what is actually wrong.
     throw new AdminAuthError("Bu hisobda admin huquqi yo‘q.", 403);

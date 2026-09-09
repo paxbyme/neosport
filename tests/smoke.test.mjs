@@ -340,7 +340,7 @@ test("mobile navigation stays out of layout when closed and map marker has no lo
   assert.match(landingCss, /\.place-map \.map-pin \{[\s\S]*?background: var\(--lime\)/);
 });
 
-test("admin panel and server-side product management are wired", () => {
+test("admin panel and server-side product management are wired", async () => {
   const adminHtml = read("admin-product.html");
   const adminScript = read("admin-product.js");
 
@@ -355,11 +355,11 @@ test("admin panel and server-side product management are wired", () => {
   assert.match(script, /fetch\("\/api\/products"/);
 
   resetRateLimits();
-  assert.throws(
+  await assert.rejects(
     () => requireAdmin(fakeRequest({ authorization: "Bearer wrong" }), { ADMIN_PASSWORD: "correct-password" }),
     /Parol noto‘g‘ri/,
   );
-  assert.doesNotThrow(() =>
+  await assert.doesNotReject(() =>
     requireAdmin(fakeRequest({ authorization: "Bearer correct-password" }), { ADMIN_PASSWORD: "correct-password" }),
   );
 });
@@ -482,6 +482,7 @@ const adminPages = [
   ["/admin/products", "admin-products.html", "admin-products.js"],
   ["/admin/product", "admin-product.html", "admin-product.js"],
   ["/admin/customers", "admin-customers.html", "admin-customers.js"],
+  ["/admin/admins", "admin-admins.html", "admin-admins.js"],
 ];
 
 test("every admin document and module is explicitly published and served", () => {
@@ -940,24 +941,24 @@ test("an expired session is not accepted", () => {
   assert.ok(claims.exp - claims.iat <= 30 * 24 * 60 * 60, "sessions must not outlive 30 days");
 });
 
-test("admin access follows ADMIN_EMAILS, not the cookie or a password", () => {
+test("admin access follows ADMIN_EMAILS, not the cookie or a password", async () => {
   resetRateLimits();
   const adminCookie = asCookieHeader(createSessionCookie(googleUser, { environment: sessionEnvironment }));
 
-  const session = requireAdmin(fakeRequest({ cookie: adminCookie }), sessionEnvironment);
+  const session = await requireAdmin(fakeRequest({ cookie: adminCookie }), sessionEnvironment);
   assert.equal(session.role, "admin");
 
   // A signed-in customer gets 403, and is never offered the password path.
   const customerCookie = asCookieHeader(
     createSessionCookie({ ...googleUser, email: "mijoz@gmail.com" }, { environment: sessionEnvironment }),
   );
-  assert.throws(
+  await assert.rejects(
     () => requireAdmin(fakeRequest({ cookie: customerCookie }), { ...sessionEnvironment, ADMIN_PASSWORD: "correct" }),
     (error) => error.status === 403 && /admin huquqi yo‘q/.test(error.message),
   );
 
   // With no session and no password configured, there is simply no way in.
-  assert.throws(
+  await assert.rejects(
     () => requireAdmin(fakeRequest({}), { SESSION_SECRET: sessionEnvironment.SESSION_SECRET }),
     /Google orqali kiring/,
   );
@@ -966,17 +967,17 @@ test("admin access follows ADMIN_EMAILS, not the cookie or a password", () => {
   assert.equal(isAdminEmail("", sessionEnvironment), false);
 });
 
-test("password attempts are rate limited", () => {
+test("password attempts are rate limited", async () => {
   resetRateLimits();
   const environment = { ADMIN_PASSWORD: "correct-password" };
   const attempt = () => requireAdmin(fakeRequest({ authorization: "Bearer wrong" }), environment);
 
   for (let index = 0; index < 10; index += 1) {
-    assert.throws(attempt, /Parol noto‘g‘ri/, `attempt ${index + 1} should still be checked`);
+    await assert.rejects(attempt, /Parol noto‘g‘ri/, `attempt ${index + 1} should still be checked`);
   }
 
   // The eleventh attempt inside the window is refused before the comparison.
-  assert.throws(attempt, (error) => error.status === 429 && /Juda ko‘p urinish/.test(error.message));
+  await assert.rejects(attempt, (error) => error.status === 429 && /Juda ko‘p urinish/.test(error.message));
   resetRateLimits();
 });
 

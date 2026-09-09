@@ -26,7 +26,7 @@ const idFrom = (request) => new URL(request.url, "http://localhost").searchParam
 
 export default async function handler(request, response) {
   try {
-    requireAdmin(request);
+    await requireAdmin(request);
 
     if (request.method === "GET") {
       const categories = await listCategories(process.env, { includeInactive: true });

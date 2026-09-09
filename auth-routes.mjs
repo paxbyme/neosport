@@ -18,6 +18,7 @@ import {
   safeNextPath,
   SESSION_COOKIE,
 } from "./auth-session.mjs";
+import { isStoredAdmin } from "./admin-service.mjs";
 import { exchangeCodeForUser, googleAuthorizeUrl, isAuthConfigured } from "./auth-service.mjs";
 import {
   callTelegram,
@@ -105,8 +106,14 @@ const logout = async (request, response) => {
   redirect(response, safeNextPath(query(request).get("next")), [clearCookie(SESSION_COOKIE, { request }), clearCookie(TELEGRAM_COOKIE, { request })]);
 };
 
-const me = (request, response) => {
+const me = async (request, response) => {
   const session = readSession(request);
+  // The panel's own admins are not in the cookie's environment lists, so the
+  // role shown here has to ask the same question requireAdmin asks. A failure
+  // to reach the list only hides the admin link; every panel request checks
+  // again anyway, so nothing is granted on the strength of this answer.
+  const granted = session && session.role !== "admin" && (await isStoredAdmin(session).catch(() => false));
+
   sendJson(response, 200, {
     ok: true,
     // The pages only show a button for a method that is actually configured.
@@ -117,7 +124,7 @@ const me = (request, response) => {
       phone: session.phone,
       name: session.name,
       picture: session.picture,
-      role: session.role,
+      role: granted ? "admin" : session.role,
     },
   });
 };

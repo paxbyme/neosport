@@ -20,12 +20,14 @@ const files = [
   "admin-products.html",
   "admin-product.html",
   "admin-customers.html",
+  "admin-admins.html",
   "admin-shell.js",
   "admin-stats.js",
   "admin-categories.js",
   "admin-products.js",
   "admin-product.js",
   "admin-customers.js",
+  "admin-admins.js",
 ];
 const assets = ["neosport-hero.png", "neosport-hero.webp", "neosport-mark.png", "neosport-mark.webp", "icons.svg", "lucide-LICENSE"];
 

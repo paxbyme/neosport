@@ -5,6 +5,7 @@ const routes = {
   products: "/admin/products",
   editor: "/admin/product",
   customers: "/admin/customers",
+  admins: "/admin/admins",
 };
 const page = document.body.dataset.adminPage;
 document.querySelector(".admin-header").innerHTML = `<button class="admin-menu-toggle icon-button" id="admin-menu-toggle" type="button" aria-label="Menyuni ochish" aria-controls="admin-nav" aria-expanded="false" hidden><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#menu" /></svg></button>
@@ -28,6 +29,7 @@ document.querySelector("#admin-shell").insertAdjacentHTML("afterbegin", `<button
           <a href="/admin/categories" data-view="categories"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#layout-grid" /></svg>Kategoriyalar</a>
           <a href="/admin/products" data-view="products"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#shopping-bag" /></svg>Mahsulotlar</a>
           <a href="/admin/customers" data-view="customers"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#users" /></svg>Mijozlar</a>
+          <a href="/admin/admins" data-view="admins"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#shield" /></svg>Adminlar</a>
           <a href="/admin/product" data-view="editor"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#plus" /></svg>Mahsulot qo‘shish</a>
         </nav>
         <div class="admin-nav-bottom"><a href="/shop"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#arrow-up-right" /></svg>Onlayn do‘kon</a><p>NEOSPORT · NAMANGAN</p></div>

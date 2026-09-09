@@ -31,7 +31,7 @@ Shu sababli marshrut uchta joyda qayd etiladi: `server.mjs` (`PRODUCT_PATH` → 
 
 Bitta hujjat barcha mahsulotlarga xizmat qiladi; qaysi mahsulot ekanini faqat manzildagi `id` hal qiladi. Mavjud bo‘lmagan yoki nofaol mahsulot **404** qaytaradi (sahifaning o‘zi baribir ko‘rsatiladi), katalog ishlamay qolsa esa sahifa **200** bilan keladi va skript qayta urinadi. `og:image` va `og:url` uchun to‘liq manzil kerak: u `SITE_URL` dan, u yo‘q bo‘lsa so‘rov host’idan olinadi.
 
-> Vercel Hobby rejasida 12 tagacha Serverless Function bo‘lishi mumkin. `api/` hozir 10 tasini ishlatadi.
+> Vercel Hobby rejasida 12 tagacha Serverless Function bo‘lishi mumkin. `api/` hozir 11 tasini ishlatadi.
 
 ### Admin sahifalari
 
@@ -45,6 +45,7 @@ Har bir boshqaruv vazifasi o‘z manzili va o‘z hujjatiga ega. Sahifa yuklanga
 | `/admin/product` | `admin-product.html` · `admin-product.js` | Mahsulot qo‘shish | `/api/admin/categories` |
 | `/admin/product?id=<id>` | yuqoridagi | Mahsulotni tahrirlash | `+ /api/admin/products` |
 | `/admin/customers` | `admin-customers.html` · `admin-customers.js` | Mijozlar | `/api/admin/customers` |
+| `/admin/admins` | `admin-admins.html` · `admin-admins.js` | Adminlar | `/api/admin/admins` |
 
 Umumiy qism — sarlavha, menyu, kirish darvozasi, `apiRequest()` va formatlash yordamchilari — `admin-shell.js` da; sahifa skriptlari uni ES modul sifatida import qiladi. Kategoriyalar sahifasi mahsulotlarni ham yuklaydi, chunki ishlatilayotgan kategoriyani o‘chirishdan himoya shunga tayanadi; mahsulot formasi kategoriyalarga tayanadi, chunki o‘lcham to‘plami kategoriya turidan kelib chiqadi.
 
@@ -93,7 +94,7 @@ API: `GET/POST/PATCH/DELETE /api/admin/categories` (admin huquqi talab qilinadi)
 Saytda ham mijozlar, ham admin **Google hisobi** bilan kiradi. Oqim serverda kechadi: `/api/auth/login` PKCE bilan Supabase Auth'ga yo‘naltiradi, `/api/auth/callback` kodni almashtiradi va imzolangan **HttpOnly** cookie o‘rnatadi. Token brauzer JavaScript'iga hech qachon tushmaydi.
 
 - **Mijozlar uchun login ixtiyoriy.** Kirmasdan ham, hozirgidek ism + telefon bilan buyurtma berish mumkin. Kirgan mijoz `/shop` sahifasida «Buyurtmalarim» bo‘limini ko‘radi va ismi avtomatik to‘ladi.
-- **Admin huquqi** `ADMIN_EMAILS` ro‘yxatidagi email'larga beriladi. Rol cookie ichida saqlanmaydi — har bir so‘rovda ro‘yxatdan qayta hisoblanadi, shuning uchun email'ni ro‘yxatdan olib tashlash huquqni darhol bekor qiladi.
+- **Admin huquqi** ikki manbadan keladi: `ADMIN_EMAILS` / `ADMIN_PHONES` ro‘yxatlari va `/admin/admins` sahifasi orqali qo‘shilgan hisoblar. Rol cookie ichida saqlanmaydi — har bir so‘rovda qayta hisoblanadi, shuning uchun ro‘yxatdan olib tashlash huquqni darhol bekor qiladi.
 - **Admin API'da rate limit bor:** bitta IP uchun 15 daqiqada 10 ta muvaffaqiyatsiz urinish. Google sessiyasi bu tekshiruvdan oldin ishlaydi, ya'ni qulflanish sizni panelga kirishdan to‘smaydi.
 - `ADMIN_PASSWORD` — eski parol yo‘li, faqat Google sozlanmaguncha. Uni sozlamasangiz, bu yo‘l butunlay o‘chiq bo‘ladi.
 
@@ -131,6 +132,21 @@ npm run telegram:setup
 `--check` Telegram saqlagan webhook sirini tekshira olmaydi, chunki API uni qaytarmaydi. Yakuniy tekshiruv: sayt orqali kirishni boshlang, botda o‘z raqamingizni ulashing va boshlang‘ich brauzer tabiga qayting. Localhost’ga Telegram webhook yubora olmaydi; haqiqiy sinov HTTPS muhitida bajariladi. `vercel env pull` dan kelgan `[SENSITIVE]` qiymatlar sir o‘rnini bosa olmaydi — haqiqiy qiymatlarni server muhitiga yoki mahalliy `.env.local` fayliga xavfsiz kiriting.
 
 Yangilanish avval boshlangan, imzosiz `ns_tg` urinishlarini bekor qiladi; ular qaytadan boshlanadi. Mavjud `ns_session` sessiyalari va saqlangan savatchalar o‘zgarmaydi. Yangi jadval yoki ma’lumotlar migratsiyasi qo‘shilmadi. Kirish urinishlariga mavjud xotira asosidagi cheklov qo‘llanadi (instance va manzil uchun 10 daqiqada 10 urinish).
+
+### Admin qo‘shish
+
+Yangi adminni `/admin/admins` sahifasidan qo‘shish mumkin — server sozlamalarini o‘zgartirib, qaytadan deploy qilish shart emas. Google hisobi uchun **email**, Telegram hisobi uchun **telefon raqami** kiritiladi; sessiya shu ikkitasidan bittasini olib yuradi, shuning uchun formada ham faqat bittasi to‘ldiriladi. Qo‘shilgan hisoblar `admins` jadvalida (lokalda `data/admins.json`) saqlanadi va kim qo‘shgani yozib boriladi.
+
+Ikki manba ataylab bir xil ishlamaydi:
+
+- `ADMIN_EMAILS` va `ADMIN_PHONES` — **zaxira yo‘l**. Ular bazaga umuman murojaat qilmaydi, har so‘rovda qaytadan hisoblanadi va **panel orqali o‘chirilmaydi**. Shuning uchun baza ishlamay qolsa ham, panelda noto‘g‘ri satr o‘chirilsa ham, do‘konga kirish yo‘li yopilib qolmaydi.
+- `admins` jadvali — panel boshqaradigan ro‘yxat. U faqat environment «yo‘q» degandan keyin tekshiriladi, ya’ni oddiy mijoz so‘rovi bu qidiruvni umuman to‘lamaydi.
+
+Qo‘shimcha qoidalar: admin **o‘zini** ro‘yxatdan chiqara olmaydi (aks holda o‘zi ocholmaydigan panelga qarab qoladi), adminlar ro‘yxatini faqat admin ko‘ra va o‘zgartira oladi, va ro‘yxatni o‘qib bo‘lmasa so‘rov **503** bilan rad etiladi — ishlamayotgan baza hech kimni jimgina huquqdan mahrum qilmaydi.
+
+`admins` jadvali `supabase-schema.sql` ichida; mavjud o‘rnatmalarda faylni qayta ishga tushirish yetarli (`create table if not exists`).
+
+> Vercel Hobby rejasida 12 tagacha Serverless Function bo‘lishi mumkin. `api/` hozir 11 tasini ishlatadi.
 
 ## Statistika
 

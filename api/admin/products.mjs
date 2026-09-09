@@ -23,7 +23,7 @@ const parseBody = (request) => {
 
 export default async function handler(request, response) {
   try {
-    requireAdmin(request);
+    await requireAdmin(request);
 
     if (request.method === "GET") {
       const products = await listProducts(process.env, { includeInactive: true });

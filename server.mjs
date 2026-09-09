@@ -2,6 +2,7 @@ import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import adminCategoriesHandler from "./api/admin/categories.mjs";
+import adminAdminsHandler from "./api/admin/admins.mjs";
 import adminCustomersHandler from "./api/admin/customers.mjs";
 import adminProductsHandler from "./api/admin/products.mjs";
 import adminStatsHandler from "./api/admin/stats.mjs";
@@ -70,6 +71,7 @@ createServer(async (request, response) => {
     "/api/products": productsHandler,
     "/api/orders": ordersHandler,
     "/api/admin/categories": adminCategoriesHandler,
+    "/api/admin/admins": adminAdminsHandler,
     "/api/admin/customers": adminCustomersHandler,
     "/api/admin/products": adminProductsHandler,
     "/api/admin/stats": adminStatsHandler,
@@ -109,6 +111,7 @@ createServer(async (request, response) => {
     "/admin/products": "admin-products.html",
     "/admin/product": "admin-product.html",
     "/admin/customers": "admin-customers.html",
+    "/admin/admins": "admin-admins.html",
     "/shop": "shop.html",
   }[safePath];
   let filePath = join(root, pageFile || safePath);

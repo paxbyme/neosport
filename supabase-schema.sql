@@ -95,6 +95,28 @@ create index if not exists users_created_at_idx on public.users (created_at desc
 
 alter table public.users enable row level security;
 
+-- Admins the panel itself manages, alongside ADMIN_EMAILS and ADMIN_PHONES.
+-- The environment lists stay the recovery path: they need no database, they
+-- are recomputed on every request, and the panel cannot remove them, so a bad
+-- row here can never lock everyone out of the shop.
+create table if not exists public.admins (
+  -- "email:<address>" or "phone:<digits>" — the identifier a session matches on.
+  id text primary key,
+  -- Exactly one of these is set; the other stays empty. A session is matched
+  -- only on the identifier it actually carries, never on an empty string.
+  email text not null default '',
+  phone text not null default '',
+  name text not null default '',
+  created_at timestamptz not null default now(),
+  -- Who granted the access, for the panel to show.
+  created_by text not null default ''
+);
+
+create index if not exists admins_email_idx on public.admins (email);
+create index if not exists admins_phone_idx on public.admins (phone);
+
+alter table public.admins enable row level security;
+
 -- One row per Telegram sign-in attempt. The browser holds the token in an
 -- HttpOnly cookie; the bot fills in who verified it.
 create table if not exists public.login_tokens (

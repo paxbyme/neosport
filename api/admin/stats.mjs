@@ -7,7 +7,7 @@ export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
 
   try {
-    requireAdmin(request);
+    await requireAdmin(request);
 
     if (request.method !== "GET") {
       response.setHeader("Allow", "GET");

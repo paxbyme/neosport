@@ -16,6 +16,7 @@
     { "source": "/admin/products", "destination": "/admin-products.html" },
     { "source": "/admin/product", "destination": "/admin-product.html" },
     { "source": "/admin/customers", "destination": "/admin-customers.html" },
+    { "source": "/admin/admins", "destination": "/admin-admins.html" },
     { "source": "/shop", "destination": "/shop.html" },
     { "source": "/products/([A-Za-z0-9-]{3,80})", "destination": "/api/product-page?id=$1" }
   ]

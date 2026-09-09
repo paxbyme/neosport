@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#080a08" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>NeoSport — Adminlar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/assets/neosport-mark.png" />
+    <link rel="stylesheet" href="/admin.css" />
+    <link rel="stylesheet" href="/telegram-login.css" />
+  </head>
+  <body data-admin-page="admins">
+    <a class="skip-link" href="#admin-panel">Asosiy qismga o‘tish</a>
+    <header class="admin-header"></header>
+    <div class="admin-shell" id="admin-shell" hidden>
+      <main class="admin-main">
+        <div class="admin-intro"><p>NEOSPORT / BOSHQARUV</p><h1 id="admin-view-title" tabindex="-1">Adminlar</h1><p id="admin-view-description">Panelga kira oladigan hisoblar.</p></div>
+        <section class="admin-panel" id="admin-panel" hidden>
+        <section class="admin-section" id="admins" data-admin-view="admins" aria-labelledby="admin-list-title">
+          <form class="admin-form" id="admin-add-form" novalidate>
+            <div class="form-heading">
+              <div><h2 id="admin-form-title">Admin qo‘shish</h2><p id="admin-form-hint">Google hisobi uchun email, Telegram hisobi uchun telefon raqamini kiriting — bittasini.</p></div>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>Email (Google)</span><input id="admin-email" name="email" type="email" autocomplete="off" inputmode="email" maxlength="120" placeholder="admin@example.com" /></label>
+              <label class="field"><span>Telefon (Telegram)</span><input id="admin-phone" name="phone" type="tel" autocomplete="off" inputmode="tel" maxlength="24" placeholder="+998 90 123 45 67" /></label>
+              <label class="field"><span>Izoh uchun ism</span><input id="admin-name" name="name" type="text" autocomplete="off" maxlength="80" placeholder="Ixtiyoriy" /></label>
+            </div>
+            <div class="form-actions">
+              <button class="primary-button" id="add-admin-button" type="submit">Admin qo‘shish</button>
+            </div>
+            <p class="admin-status" id="admin-form-status" role="status" aria-live="polite"></p>
+          </form>
+
+          <div class="form-heading">
+            <div><h2 id="admin-list-title">Adminlar</h2></div>
+            <p id="admin-count" role="status">Yuklanmoqda...</p>
+          </div>
+          <p class="admin-hint" id="admin-hint">Server sozlamalaridagi (<code>ADMIN_EMAILS</code>, <code>ADMIN_PHONES</code>) adminlarni bu yerdan o‘chirib bo‘lmaydi — ular panel ishlamay qolganda ham kira oladigan zaxira yo‘l.</p>
+          <p class="admin-status" id="admin-list-status" role="status" aria-live="polite"></p>
+          <button class="secondary-button" id="admins-retry" type="button" hidden>Qayta urinish</button>
+          <div class="admin-customer-list" id="admin-list" aria-live="polite"></div>
+        </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="login-layer" id="login-layer" hidden>
+      <form class="login-card" id="login-form">
+        <picture>
+          <source srcset="/assets/neosport-mark.webp" type="image/webp" />
+          <img src="/assets/neosport-mark.png" alt="NeoSport" width="480" height="540" />
+        </picture>
+        <p>HIMOYALANGAN SAHIFA</p>
+        <h2>ADMIN KIRISH</h2>
+
+        <a class="google-button" id="google-signin" href="/api/auth/login?next=/admin" hidden>
+          <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z" />
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z" />
+            <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z" />
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
+          </svg>
+          <span>Google bilan kirish</span>
+        </a>
+
+        <a class="telegram-button" id="telegram-signin" href="/api/auth/telegram/start?next=/admin" hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path fill="#2AABEE" d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Z" />
+            <path fill="#fff" d="M16.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+          </svg>
+          <span>Telegram orqali kirish</span>
+        </a>
+
+        <p class="login-or" id="login-or" hidden>yoki</p>
+
+        <div class="login-password" id="login-password" hidden>
+          <label>
+            <span>PAROL</span>
+            <input type="password" name="password" autocomplete="current-password" />
+          </label>
+          <button type="submit">Kirish <span aria-hidden="true">→</span></button>
+        </div>
+
+        <p class="login-status" id="login-status" role="alert">Tekshirilmoqda...</p>
+        <a class="login-back" href="/">← Saytga qaytish</a>
+      </form>
+    </div>
+
+    <script src="/telegram-login.js"></script>
+    <script type="module" src="/admin-admins.js"></script>
+  </body>
+</html>
