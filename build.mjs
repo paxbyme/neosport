@@ -6,6 +6,7 @@ const output = join(root, "dist");
 const files = [
   "index.html",
   "shop.html",
+  "product.html",
   "styles.css",
   "landing.css",
   "shop.css",

@@ -5,13 +5,18 @@
   "outputDirectory": "dist",
   "cleanUrls": false,
   "trailingSlash": false,
+  "functions": {
+    "api/product-page.mjs": { "includeFiles": "product.html" }
+  },
   "rewrites": [
     { "source": "/api/auth/(.*)", "destination": "/api/auth?action=$1" },
+    { "source": "/api/orders/([^/]+)", "destination": "/api/orders?id=$1" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/categories", "destination": "/admin-categories.html" },
     { "source": "/admin/products", "destination": "/admin-products.html" },
     { "source": "/admin/product", "destination": "/admin-product.html" },
     { "source": "/admin/customers", "destination": "/admin-customers.html" },
-    { "source": "/shop", "destination": "/shop.html" }
+    { "source": "/shop", "destination": "/shop.html" },
+    { "source": "/products/([A-Za-z0-9-]{3,80})", "destination": "/api/product-page?id=$1" }
   ]
 }

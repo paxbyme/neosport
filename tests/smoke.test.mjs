@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { requireAdmin } from "../admin-auth.mjs";
+import { isPublicPreviewPath } from "../preview-static.mjs";
+import { PRODUCT_PATH } from "../api/product-page.mjs";
 import { createTelegramOrder } from "../order-service.mjs";
 import { createCategory, deleteCategory, updateCategory } from "../category-service.mjs";
 import { createProduct, effectivePrice, MAX_DISCOUNT_PERCENT, MAX_IMAGES, updateProduct } from "../product-service.mjs";
@@ -32,6 +34,7 @@ const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 const html = read("index.html");
 const shopHtml = read("shop.html");
+const productHtml = read("product.html");
 const css = read("styles.css");
 const landingCss = read("landing.css");
 const shopCss = read("shop.css");
@@ -128,6 +131,7 @@ test("shop uses the same retail layout system as the landing page", () => {
   assert.match(script, /class="pdp-media"/);
   assert.match(script, /class="pdp-panel"/);
   assert.match(shopCss, /\.pdp-panel \{[^}]*position: sticky;/);
+  assert.doesNotMatch(script + storefrontUi + shopHtml + productHtml + shopCss, /product-modal|data-open-product/);
 
   // Photography stays contained, with a stable square image area on both pages.
   assert.match(shopCss, /\.catalog-card-image \{[^}]*aspect-ratio: 1;/);
@@ -142,6 +146,48 @@ test("shop uses the same retail layout system as the landing page", () => {
 
   // The old landing/shop rules are gone from the shared stylesheet.
   assert.doesNotMatch(css, /\.catalog-card|\.pdp-panel|\.cart-drawer|\.shop-product/);
+});
+
+test("every product has its own page, reachable as an ordinary link", () => {
+  const files = JSON.parse(read("build.mjs").match(/const files = (\[[\s\S]*?\]);/)[1].replace(/,\s*]/, "]"));
+  const publicPaths = JSON.parse(read("preview-static.mjs").match(/const publicPaths = new Set\((\[[\s\S]*?\])\)/)[1].replace(/,\s*]/, "]"));
+  const config = JSON.parse(read("vercel.json"));
+  const address = "/products/product-1234abcd-5678-90ef-1234-567890abcdef";
+
+  // A function answers the route on both hosts, so the sharing metadata is
+  // filled in before a crawler that never runs the script sees the page.
+  assert.ok(config.rewrites.some(rule => /^\/products\//.test(rule.source) && rule.destination === "/api/product-page?id=$1"));
+  assert.equal(config.functions["api/product-page.mjs"].includeFiles, "product.html", "the document travels with the function");
+  assert.match(read("server.mjs"), /PRODUCT_PATH\.test\(pathname\) \? productPageHandler/);
+  assert.ok(files.includes("product.html"), "build list");
+  assert.ok(publicPaths.includes("/product.html"), "preview list");
+  assert.equal(read("dist/product.html"), productHtml, "built product.html");
+
+  // Only the id shape reaches the page; nothing else matches the route.
+  assert.equal(PRODUCT_PATH.test(address), true);
+  for (const path of ["/products/", "/products/a", "/products/one/two", "/products/../../.env.local", "/products/.env", "/products/a b"])
+    assert.equal(PRODUCT_PATH.test(path), false, path);
+
+  // The card links out with real anchors, so a new tab and a share both work.
+  assert.match(script, /const productHref = \(id\) => `\/products\/\$\{encodeURIComponent\(id\)\}`/);
+  assert.equal((script.match(/href="\$\{escapeHtml\(productHref\(product\.id\)\)\}"/g) || []).length, 3);
+  assert.match(script, /<h3 class="catalog-card-name"><a href=/);
+
+  // The page renders from the address alone, with a state for each outcome.
+  assert.match(script, /window\.location\.pathname\.match\(\/\^\\\/products/);
+  assert.match(script, /fetch\(`\/api\/products\?id=\$\{encodeURIComponent\(productPageId\)\}`/);
+  for (const state of ["loading", "missing", "error"]) assert.ok(script.includes(`${state}:`), state);
+  assert.match(productHtml, /id="product-detail"/);
+  assert.match(shopCss, /\.product-detail-loading \{/);
+  assert.match(shopCss, /\.product-missing \{/);
+
+  // Assets and scripts are addressed from the root: this page sits a level
+  // deeper than the other documents. The empty canonical href is the
+  // self-referential placeholder the script fills in with the product's address.
+  assert.doesNotMatch(productHtml, /(?:href|src)="(?!\/|#|https:|")/);
+  assert.match(productHtml, /<link rel="canonical" href="" \/>/);
+  assert.match(script, /link\[rel="canonical"\]/);
+  assert.match(read("storefront-ui.js"), /href="\/assets\/icons\.svg#/);
 });
 
 test("shop is a standalone page linked from the landing page", () => {

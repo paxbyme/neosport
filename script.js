@@ -131,8 +131,7 @@ const checkoutButton = document.querySelector("#checkout-button");
 const checkoutStatus = document.querySelector("#checkout-status");
 const catalogGrid = document.querySelector("#catalog-grid");
 const catalogEmpty = document.querySelector("#catalog-empty");
-const productModal = document.querySelector("#product-modal");
-const productModalBody = document.querySelector("#product-modal-body");
+const productDetail = document.querySelector("#product-detail");
 const accountSlot = document.querySelector("#account");
 const accountOrders = document.querySelector("#account-orders");
 const accountOrdersBody = document.querySelector("#account-orders-body");
@@ -154,8 +153,9 @@ const escapeHtml = (value) =>
 
 const safeImageUrl = (value) => {
   const url = String(value || "");
-  // The fallback has to be an asset the build actually ships.
-  return /^(https:\/\/|\/|assets\/)/i.test(url) ? url : "assets/neosport-mark.webp";
+  // The fallback has to be an asset the build actually ships, addressed from
+  // the site root: /products/<id> is a level deeper than the other pages.
+  return /^(https:\/\/|\/|assets\/)/i.test(url) ? url : "/assets/neosport-mark.webp";
 };
 
 const sanitizeCart = (value) => {
@@ -196,11 +196,11 @@ let cart = [];
 let lastFocusedElement = null;
 let closeCartTimer = null;
 
-const productDetails = {};
-let modalProductId = null;
-let modalQuantity = 1;
-let lastModalFocus = null;
-let closeModalTimer = null;
+// Every product has its own page at /products/<id>. The id in the address bar
+// is the only thing that decides which product this page shows.
+const productPageId = window.location.pathname.match(/^\/products\/([A-Za-z0-9-]{3,80})$/)?.[1] || "";
+const productHref = (id) => `/products/${encodeURIComponent(id)}`;
+let productQuantity = 1;
 let toastTimer = null;
 const announce = (message) => {
   const toast = document.querySelector("#storefront-toast");
@@ -294,7 +294,7 @@ const closeCart = (restoreFocus = true) => {
 const syncCartLayout = () => {
   if (!cartLayer || !cartDrawer) return;
   window.clearTimeout(closeCartTimer);
-  const wasOpen = document.body.classList.contains("cart-open") && productModal.hidden;
+  const wasOpen = document.body.classList.contains("cart-open");
   if (hasDesktopCart()) {
     cartLayer.hidden = false;
     cartDrawer.setAttribute("role", "complementary");
@@ -326,7 +326,7 @@ document.querySelectorAll("[data-cart-close]").forEach((button) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (!cartLayer || cartLayer.hidden || hasDesktopCart() || !productModal.hidden) return;
+  if (!cartLayer || cartLayer.hidden || hasDesktopCart()) return;
 
   if (event.key === "Escape") {
     event.preventDefault();
@@ -397,17 +397,19 @@ const sortSelect = document.querySelector("#catalog-sort");
 const categoryChips = document.querySelector("#category-chips");
 const normalizeSearch = (value) => String(value).toLocaleLowerCase("uz").normalize("NFKC").replace(/[‘’ʻʼ`']/g, "");
 
+// Image, title and action are ordinary links to the product's own page, so a
+// customer can open one in a new tab, share it or bookmark it like any address.
 const productCard = (product) => `
   <article class="catalog-card">
-    <button class="catalog-card-trigger" type="button" data-open-product="${escapeHtml(product.id)}" aria-label="${escapeHtml(product.name)} — rasmlar va tafsilotlar">
+    <a class="catalog-card-trigger" href="${escapeHtml(productHref(product.id))}" aria-label="${escapeHtml(product.name)} — rasmlar va tafsilotlar">
       <span class="catalog-card-image"><img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" width="720" height="720" loading="lazy" decoding="async" />${product.discountPercent > 0 && product.finalPrice < product.price ? `<span class="catalog-discount">−${product.discountPercent}%</span>` : ""}</span>
-    </button>
+    </a>
     <div class="catalog-card-body">
       <p class="catalog-card-brand"><span>${escapeHtml(product.brand)}</span><span>${escapeHtml(product.category)}</span></p>
-      <h3 class="catalog-card-name">${escapeHtml(product.name)}</h3>
+      <h3 class="catalog-card-name"><a href="${escapeHtml(productHref(product.id))}">${escapeHtml(product.name)}</a></h3>
       ${priceMarkup(product, "catalog-card-price")}
       <div class="catalog-card-variants"><span>${escapeHtml(product.sizes.slice(0, 3).join(" · "))}${product.sizes.length > 3 ? ` · +${product.sizes.length - 3}` : ""}</span><span class="card-colors" aria-label="${escapeHtml(product.colors.map((color) => color.label).join(", "))}">${product.colors.slice(0, 3).map((color) => `<span class="card-color" style="background:${escapeHtml(color.hex)}" title="${escapeHtml(color.label)}"></span>`).join("")}${product.colors.length > 3 ? `+${product.colors.length - 3}` : ""}</span></div>
-      <button class="catalog-card-action" type="button" data-open-product="${escapeHtml(product.id)}" aria-label="${escapeHtml(product.name)} — rang va o‘lchamni tanlash">Tanlash ${icon("plus")}</button>
+      <a class="catalog-card-action" href="${escapeHtml(productHref(product.id))}" aria-label="${escapeHtml(product.name)} — rang va o‘lchamni tanlash">Tanlash ${icon("plus")}</a>
     </div>
   </article>`;
 
@@ -480,7 +482,7 @@ catalogEmpty?.addEventListener("click", (event) => {
   if (event.target.closest("[data-catalog-retry]")) loadProducts();
 });
 
-const buildProductModal = (product) => {
+const buildProductDetail = (product) => {
   const colorOptions = product.colors
     .map(
       (color, index) => `
@@ -502,7 +504,7 @@ const buildProductModal = (product) => {
   return `
     <article class="pdp">
       <div class="pdp-media">
-        <img id="modal-product-image" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" width="900" height="1120" decoding="async" />
+        <img id="product-image" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" width="900" height="1120" decoding="async" />
         ${
           product.images.length > 1
             ? `<div class="pdp-thumbs" role="group" aria-label="Mahsulot rasmlari">${product.images
@@ -518,7 +520,7 @@ const buildProductModal = (product) => {
       </div>
       <div class="pdp-panel">
         <p class="pdp-brand">${escapeHtml(product.brand.toUpperCase())} · ${escapeHtml(product.category.toUpperCase())}</p>
-        <h3 class="pdp-name" id="modal-product-name">${escapeHtml(product.name)}</h3>
+        <h1 class="pdp-name" id="product-name">${escapeHtml(product.name)}</h1>
         <div class="pdp-price">${
           product.discountPercent > 0 && product.finalPrice < product.price
             ? `${formatPlain(product.finalPrice)} <small>so‘m</small><s>${formatPlain(product.price)}</s><b>−${product.discountPercent}%</b>`
@@ -526,9 +528,9 @@ const buildProductModal = (product) => {
         }</div>
         <div class="pdp-stock">${icon("check")} Sotuvda mavjud</div>
         ${product.description ? `<p class="pdp-desc">${escapeHtml(product.description)}</p>` : ""}
-        <form class="product-order-form pdp-form" id="modal-product-form" data-product-id="${escapeHtml(product.id)}" novalidate>
+        <form class="product-order-form pdp-form" id="product-form" data-product-id="${escapeHtml(product.id)}" novalidate>
           <fieldset class="product-option-group color-options">
-            <legend>Rang <span id="modal-selected-color">${escapeHtml(firstColor?.label || "")}</span></legend>
+            <legend>Rang <span id="selected-color">${escapeHtml(firstColor?.label || "")}</span></legend>
             <div class="option-row">${colorOptions}</div>
           </fieldset>
           <fieldset class="product-option-group size-options">
@@ -538,12 +540,12 @@ const buildProductModal = (product) => {
           <div class="pdp-buy">
             <div class="quantity-picker" role="group" aria-label="Mahsulot soni">
               <button type="button" data-quantity-action="decrease" aria-label="Soni kamaytirish" title="Kamaytirish" disabled>${icon("minus")}</button>
-              <output id="modal-product-quantity" aria-live="polite">1</output>
+              <output id="product-quantity" aria-live="polite">1</output>
               <button type="button" data-quantity-action="increase" aria-label="Soni oshirish" title="Oshirish">${icon("plus")}</button>
             </div>
-            <button class="shop-add-button" type="submit" aria-disabled="true" aria-describedby="modal-form-status">Savatchaga qo‘shish</button>
+            <button class="shop-add-button" type="submit" aria-disabled="true" aria-describedby="product-form-status">Savatchaga qo‘shish</button>
           </div>
-          <p class="product-form-status" id="modal-form-status" role="status" aria-live="polite">O‘lchamni tanlang.</p>
+          <p class="product-form-status" id="product-form-status" role="status" aria-live="polite">O‘lchamni tanlang.</p>
         </form>
         <ul class="pdp-perks">
           <li>${icon("map-pin")} Namangandagi do‘konimizda kiyib ko‘ring.</li>
@@ -552,70 +554,99 @@ const buildProductModal = (product) => {
     </article>`;
 };
 
-const openProductModal = (productId) => {
-  const product = productDetails[productId];
-  if (!product || !productModal || !productModalBody) return;
-  if (closeModalTimer) window.clearTimeout(closeModalTimer);
+/* ------------------------------------------------------- the product page -- */
 
-  modalProductId = productId;
-  modalQuantity = 1;
-  productModalBody.innerHTML = buildProductModal(product);
-
-  lastModalFocus = document.activeElement;
-  productModal.hidden = false;
-  document.body.classList.add("cart-open");
-  isolateSurface(productModal);
-  window.requestAnimationFrame(() => productModal.classList.add("is-open"));
-  productModal.querySelector(".product-modal-close")?.focus();
+const PRODUCT_STATES = {
+  loading: () => '<div class="product-detail-loading" aria-hidden="true"><div></div><span></span><span></span><span></span></div>',
+  missing: () =>
+    `<div class="product-missing">${icon("package-open")}<h1>Mahsulot topilmadi</h1><p>Bu mahsulot sotuvdan olingan yoki havola noto‘g‘ri.</p><a class="text-button" href="/shop">Katalogga qaytish</a></div>`,
+  error: () =>
+    `<div class="product-missing">${icon("rotate-ccw")}<h1>Mahsulot yuklanmadi</h1><p>Ulanishni tekshirib, yana urinib ko‘ring.</p><button class="text-button" type="button" data-product-retry>Qayta urinish</button></div>`,
 };
 
-const closeProductModal = (restoreFocus = true) => {
-  if (!productModal || productModal.hidden) return;
-  productModal.classList.remove("is-open");
-  document.body.classList.remove("cart-open");
-  isolateSurface(null);
+const setProductState = (state) => {
+  if (!productDetail) return;
+  productDetail.setAttribute("aria-busy", String(state === "loading"));
+  productDetail.innerHTML = PRODUCT_STATES[state]();
+};
 
-  const finish = () => {
-    productModal.hidden = true;
-    productModalBody.innerHTML = "";
-    modalProductId = null;
-    if (restoreFocus && lastModalFocus instanceof HTMLElement) lastModalFocus.focus();
+// api/product-page.mjs already put this in the head for crawlers that never
+// run a script. Repeating it here keeps the page correct when the plain
+// document is served instead — and when the catalog was unreachable then and
+// the retry below is what finally found the product.
+const describeProductPage = (product) => {
+  document.title = `${product.name} — NeoSport`;
+  const description = product.description || `${product.brand} · ${product.category}`;
+  const absolute = (path) => new URL(path, window.location.origin).href;
+  const meta = {
+    'meta[name="description"]': description,
+    'meta[property="og:title"]': `${product.name} — NeoSport`,
+    'meta[property="og:description"]': description,
+    // Crawlers need whole addresses, and product photos may be stored locally.
+    'meta[property="og:image"]': absolute(product.imageUrl),
+    'meta[property="og:url"]': absolute(productHref(product.id)),
   };
-
-  if (reduceMotion) finish();
-  else closeModalTimer = window.setTimeout(finish, 180);
+  for (const [selector, content] of Object.entries(meta)) {
+    document.querySelector(selector)?.setAttribute("content", content);
+  }
+  document.querySelector('link[rel="canonical"]')?.setAttribute("href", absolute(productHref(product.id)));
 };
 
-catalogGrid?.addEventListener("click", (event) => {
-  const trigger = event.target.closest("[data-open-product]");
-  if (!trigger) return;
-  openProductModal(trigger.dataset.openProduct);
-});
+const renderProductPage = (product) => {
+  if (!productDetail) return;
+  productQuantity = 1;
+  productDetail.setAttribute("aria-busy", "false");
+  productDetail.innerHTML = buildProductDetail(product);
+  describeProductPage(product);
+};
 
-productModal?.addEventListener("click", (event) => {
-  if (event.target.closest("[data-modal-close]")) closeProductModal();
-});
+const loadProductPage = async () => {
+  if (!productDetail) return;
+  if (!productPageId) return setProductState("missing");
 
-productModal?.addEventListener("click", (event) => {
+  setProductState("loading");
+  try {
+    const response = await fetch(`/api/products?id=${encodeURIComponent(productPageId)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (response.status === 404) return setProductState("missing");
+    if (!response.ok) throw new Error("Mahsulotni yuklab bo‘lmadi.");
+
+    const result = await response.json();
+    const product = normalizePublicProduct(result.product);
+    if (!product) return setProductState("missing");
+
+    // Registered before the catalog request finishes, so the buy controls work
+    // as soon as the page is drawn.
+    registerProduct(product);
+    renderProductPage(product);
+  } catch (error) {
+    console.warn(error.message);
+    setProductState("error");
+  }
+};
+
+productDetail?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-product-retry]")) loadProductPage();
+
   const thumb = event.target.closest("[data-thumb]");
   if (!thumb) return;
-
-  const image = productModal.querySelector("#modal-product-image");
+  const image = productDetail.querySelector("#product-image");
   if (image) image.src = thumb.dataset.thumb;
-  productModal.querySelectorAll(".pdp-thumb").forEach((button) => { button.classList.toggle("is-active", button === thumb); button.setAttribute("aria-pressed", String(button === thumb)); });
+  productDetail.querySelectorAll(".pdp-thumb").forEach((button) => { button.classList.toggle("is-active", button === thumb); button.setAttribute("aria-pressed", String(button === thumb)); });
 });
 
-productModal?.addEventListener("change", (event) => {
+productDetail?.addEventListener("change", (event) => {
   const input = event.target;
   if (input.name === "size" && input.checked) {
-    productModal.querySelector(".shop-add-button").setAttribute("aria-disabled", "false");
-    productModal.querySelector("#modal-form-status").textContent = `Tanlangan o‘lcham: ${input.value}`;
+    productDetail.querySelector(".shop-add-button").setAttribute("aria-disabled", "false");
+    productDetail.querySelector("#product-form-status").textContent = `Tanlangan o‘lcham: ${input.value}`;
   }
   if (input.name !== "color" || !input.checked) return;
-  const label = productModal.querySelector("#modal-selected-color");
+  const label = productDetail.querySelector("#selected-color");
   if (label) label.textContent = String(input.dataset.label || "");
 
-  const image = productModal.querySelector("#modal-product-image");
+  const image = productDetail.querySelector("#product-image");
   if (image && input.dataset.image) {
     image.src = input.dataset.image;
     if (!reduceMotion && typeof image.animate === "function") {
@@ -624,19 +655,19 @@ productModal?.addEventListener("change", (event) => {
   }
 });
 
-productModal?.addEventListener("click", (event) => {
+productDetail?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-quantity-action]");
   if (!button) return;
   const delta = button.dataset.quantityAction === "increase" ? 1 : -1;
-  modalQuantity = Math.max(1, Math.min(10, modalQuantity + delta));
-  const output = productModal.querySelector("#modal-product-quantity");
-  if (output) output.textContent = String(modalQuantity);
-  productModal.querySelector('[data-quantity-action="decrease"]').disabled = modalQuantity === 1;
-  productModal.querySelector('[data-quantity-action="increase"]').disabled = modalQuantity === 10;
+  productQuantity = Math.max(1, Math.min(10, productQuantity + delta));
+  const output = productDetail.querySelector("#product-quantity");
+  if (output) output.textContent = String(productQuantity);
+  productDetail.querySelector('[data-quantity-action="decrease"]').disabled = productQuantity === 1;
+  productDetail.querySelector('[data-quantity-action="increase"]').disabled = productQuantity === 10;
 });
 
-productModal?.addEventListener("submit", (event) => {
-  const form = event.target.closest("#modal-product-form");
+productDetail?.addEventListener("submit", (event) => {
+  const form = event.target.closest("#product-form");
   if (!form) return;
   event.preventDefault();
 
@@ -645,7 +676,7 @@ productModal?.addEventListener("submit", (event) => {
   const color = String(formData.get("color") || "");
   const size = String(formData.get("size") || "");
   const product = catalogue[productId];
-  const status = productModal.querySelector("#modal-form-status");
+  const status = productDetail.querySelector("#product-form-status");
 
   if (!product || !product.colors[color]) return;
   if (!product.sizes.includes(size)) {
@@ -654,9 +685,9 @@ productModal?.addEventListener("submit", (event) => {
     return;
   }
 
-  const nextItem = { productId, color, size, quantity: modalQuantity };
+  const nextItem = { productId, color, size, quantity: productQuantity };
   const existing = cart.find((item) => cartItemKey(item) === cartItemKey(nextItem));
-  if (existing) existing.quantity = Math.min(10, existing.quantity + modalQuantity);
+  if (existing) existing.quantity = Math.min(10, existing.quantity + productQuantity);
   else cart.push(nextItem);
 
   saveCart();
@@ -666,30 +697,8 @@ productModal?.addEventListener("submit", (event) => {
     window.va("event", { name: "add_to_cart", data: { product: productId, color, size } });
   }
 
-  // Hide the modal instantly (it sits above the cart) before revealing the cart.
-  if (closeModalTimer) window.clearTimeout(closeModalTimer);
-  productModal.classList.remove("is-open");
-  productModal.hidden = true;
-  productModalBody.innerHTML = "";
-  modalProductId = null;
-  isolateSurface(null);
-  document.body.classList.remove("cart-open");
-  lastModalFocus?.focus();
   openCart();
-  if (hasDesktopCart()) announce("Mahsulot savatchaga qo‘shildi.");
-});
-
-document.addEventListener("keydown", (event) => {
-  if (!productModal || productModal.hidden) return;
-
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeProductModal();
-    return;
-  }
-
-  const dialog = productModal.querySelector(".product-modal-dialog");
-  if (dialog) trapFocus(event, dialog);
+  announce("Mahsulot savatchaga qo‘shildi.");
 });
 
 /* ------------------------------------------------------------ the account -- */
@@ -721,7 +730,7 @@ let account = null;
 
 const renderAccount = ({ user, googleEnabled, telegramEnabled }) => {
   if (!accountSlot) return;
-  const next = encodeURIComponent(accountSlot.dataset.next || "/");
+  const next = encodeURIComponent(accountSlot.dataset.next || window.location.pathname);
 
   // With no sign-in method configured there is nothing to offer, so the slot
   // stays out of the header rather than showing a dead button.
@@ -769,50 +778,15 @@ const renderAdminLink = (user) => {
   footerLinks.append(link);
 };
 
-/**
- * The bot conversation happens in another tab, so this page asks the server
- * whether the token it holds has been verified. The token is in an HttpOnly
- * cookie, which is why the server reports `waiting` instead of the page
- * looking for itself.
- */
-const checkTelegramLogin = async () => {
-  try {
-    const response = await fetch("/api/auth/telegram/status", { headers: { Accept: "application/json" } });
-    if (!response.ok) return false;
-    const result = await response.json();
-    if (result.ready) {
-      window.location.href = result.next || "/";
-      return false;
-    }
-    return Boolean(result.waiting);
-  } catch {
-    return false;
-  }
+const formatOrderDate = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("uz-UZ", { dateStyle: "medium", timeZone: "Asia/Tashkent" }).format(date);
 };
 
-let telegramPolling = false;
-
-const waitForTelegram = async () => {
-  if (telegramPolling) return;
-  telegramPolling = true;
-  if (checkoutStatus) checkoutStatus.textContent = "Telegram’da telefon raqamingizni ulashing — sahifa o‘zi yangilanadi.";
-
-  // Ten minutes, matching how long the login token stays valid.
-  for (let attempt = 0; attempt < 300; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    if (!(await checkTelegramLogin())) break;
-  }
-  telegramPolling = false;
-};
-
-accountSlot?.addEventListener("click", (event) => {
-  const trigger = event.target.closest("[data-telegram-signin]");
-  if (!trigger) return;
-  event.preventDefault();
-  // Opened in a new tab so this one stays alive to notice the result.
-  window.open(trigger.href, "_blank", "noopener");
-  waitForTelegram();
-});
+const orderItemLine = (item) =>
+  `<li>${escapeHtml(item.name)} · ${escapeHtml(item.color)} · ${escapeHtml(item.size)} · ${item.quantity} dona</li>`;
 
 const renderAccountOrders = (orders) => {
   if (!accountOrders || !accountOrdersBody) return;
@@ -823,38 +797,73 @@ const renderAccountOrders = (orders) => {
     return;
   }
 
-  const formatDate = (value) => {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? ""
-      : new Intl.DateTimeFormat("uz-UZ", { dateStyle: "medium", timeZone: "Asia/Tashkent" }).format(date);
-  };
-
   accountOrdersBody.innerHTML = orders
     .map(
       (order) => `
-        <article class="account-order">
+        <article class="account-order" data-order-id="${escapeHtml(order.id)}">
           <div class="account-order-head">
             <b>${escapeHtml(order.id)}</b>
-            <span>${escapeHtml(formatDate(order.createdAt))}</span>
+            <span>${escapeHtml(formatOrderDate(order.createdAt))}</span>
           </div>
-          <ul>${order.items
-            .map(
-              (item) =>
-                `<li>${escapeHtml(item.name)} · ${escapeHtml(item.color)} · ${escapeHtml(item.size)} · ${item.quantity} dona</li>`,
-            )
-            .join("")}</ul>
+          <ul>${order.items.map(orderItemLine).join("")}</ul>
           <strong>${formatMoney(order.total)}</strong>
+          <button class="text-button" type="button" data-order-detail="${escapeHtml(order.id)}">Tafsilotlar</button>
+          <p class="account-order-detail" data-order-detail-body hidden></p>
         </article>`,
     )
     .join("");
 };
 
+/**
+ * The detail of one order, fetched by its id. The server decides whether this
+ * customer may see it; asking for somebody else's id answers "not found", so
+ * there is nothing here for the browser to enforce.
+ */
+const loadOrderDetail = async (orderId, card) => {
+  const body = card.querySelector("[data-order-detail-body]");
+  const button = card.querySelector("[data-order-detail]");
+  if (!body || !button) return;
+
+  if (!body.hidden) {
+    body.hidden = true;
+    button.textContent = "Tafsilotlar";
+    return;
+  }
+
+  body.hidden = false;
+  body.textContent = "Yuklanmoqda...";
+  button.textContent = "Yopish";
+  try {
+    const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || "Buyurtmani ochib bo‘lmadi.");
+    body.textContent = `${result.order.customerName} · ${formatPhone(result.order.customerPhone)} · ${formatMoney(result.order.total)}`;
+  } catch (error) {
+    body.textContent = error.message;
+  }
+};
+
+accountOrdersBody?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-order-detail]");
+  const card = button?.closest("[data-order-id]");
+  if (button && card) loadOrderDetail(button.dataset.orderDetail, card);
+});
+
+// Order history belongs to whoever is signed in right now. Nothing rendered
+// for the previous account may survive a sign-out or a switch of accounts.
+const clearAccountOrders = () => {
+  if (accountOrdersBody) accountOrdersBody.innerHTML = "";
+  if (accountOrders) accountOrders.hidden = true;
+};
+
 const loadAccountOrders = async () => {
   if (!accountOrdersBody) return;
   try {
-    const response = await fetch("/api/orders", { headers: { Accept: "application/json" } });
-    if (!response.ok) return;
+    const response = await fetch("/api/orders", { headers: { Accept: "application/json" }, cache: "no-store" });
+    if (!response.ok) return clearAccountOrders();
     const result = await response.json();
     renderAccountOrders(result.orders || []);
   } catch (error) {
@@ -862,15 +871,40 @@ const loadAccountOrders = async () => {
   }
 };
 
+// Who the page is currently rendered for. Google identifies an account by
+// email and Telegram by phone; either is enough to notice that the person in
+// front of the page has changed.
+const identityOf = (user) => (user ? `${user.email || ""}|${user.phone || ""}` : "");
+const ACCOUNT_STORAGE_KEY = "neosport-account-v1";
+
+const readLastIdentity = () => {
+  try { return sessionStorage.getItem(ACCOUNT_STORAGE_KEY) || ""; }
+  catch { return ""; }
+};
+
+const rememberIdentity = (identity) => {
+  try { sessionStorage.setItem(ACCOUNT_STORAGE_KEY, identity); }
+  catch { /* The check simply repeats next time when storage is unavailable. */ }
+};
+
 const loadAccount = async () => {
   if (!accountSlot) return;
   try {
-    const response = await fetch("/api/auth/me", { headers: { Accept: "application/json" } });
+    const response = await fetch("/api/auth/me", { headers: { Accept: "application/json" }, cache: "no-store" });
     if (!response.ok) return;
     const result = await response.json();
     account = result.user || null;
     renderAccount(result);
     renderAdminLink(account);
+
+    // Signing out, or signing in as somebody else, clears everything the last
+    // account left on the page before the new session is drawn over it.
+    const identity = identityOf(account);
+    if (identity !== readLastIdentity()) {
+      clearAccountOrders();
+      checkoutForm?.reset();
+      rememberIdentity(identity);
+    }
 
     // Returning to this tab after talking to the bot: pick the flow back up.
     if (!account) {
@@ -898,6 +932,24 @@ if (authNotice && checkoutStatus) {
 }
 
 let cartHydrated = false;
+
+// The lean shape the cart prices and describes its items with.
+const registerProduct = (product) => {
+  catalogue[product.id] = {
+    name: product.name,
+    brand: product.brand,
+    // Cart totals follow the price the customer is actually charged.
+    price: product.finalPrice,
+    sizes: product.sizes,
+    colors: Object.fromEntries(
+      product.colors.map((color) => [
+        color.id,
+        { label: color.label, image: product.imageUrl, alt: `${product.name}, ${color.label} rang` },
+      ]),
+    ),
+  };
+};
+
 const loadProducts = async () => {
   const loadedProducts = [];
   catalogFailed = false;
@@ -916,20 +968,7 @@ const loadProducts = async () => {
       const product = normalizePublicProduct(item);
       if (!product) continue;
       loadedProducts.push(product);
-      productDetails[product.id] = product;
-      catalogue[product.id] = {
-        name: product.name,
-        brand: product.brand,
-        // Cart totals follow the price the customer is actually charged.
-        price: product.finalPrice,
-        sizes: product.sizes,
-        colors: Object.fromEntries(
-          product.colors.map((color) => [
-            color.id,
-            { label: color.label, image: product.imageUrl, alt: `${product.name}, ${color.label} rang` },
-          ]),
-        ),
-      };
+      registerProduct(product);
     }
     allProducts = loadedProducts;
     renderFilters();
@@ -1041,8 +1080,17 @@ checkoutForm?.addEventListener("submit", async (event) => {
   }
 });
 
+// The page renders from its own product request; the catalog request behind it
+// only fills in what the cart needs to describe items already stored.
+if (productDetail) loadProductPage();
 if (catalogGrid || cartItemsElement) loadProducts();
 loadAccount();
+
+// A page restored from the back/forward cache keeps whatever the previous
+// visitor saw. Re-reading the session throws that away before it is shown.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) loadAccount();
+});
 
 document.addEventListener("error", (event) => {
   const image = event.target;

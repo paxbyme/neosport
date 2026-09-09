@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#090a08" />
+    <meta name="description" content="NeoSport mahsuloti: rang va o‘lchamni tanlang, savatchaga qo‘shing va onlayn buyurtma bering." />
+    <meta property="og:type" content="product" />
+    <meta property="og:locale" content="uz_UZ" />
+    <meta property="og:site_name" content="NeoSport" />
+    <meta property="og:title" content="NeoSport mahsuloti" />
+    <meta property="og:description" content="Sport va kundalik uslub uchun kiyimlar." />
+    <meta property="og:image" content="/assets/neosport-hero.png" />
+    <meta property="og:url" content="" />
+    <link rel="canonical" href="" />
+    <title>Mahsulot — NeoSport</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/assets/neosport-mark.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/shop.css" />
+    <link rel="stylesheet" href="/telegram-login.css" />
+  </head>
+  <body class="shop-page">
+    <a class="skip-link" href="#main">Mahsulotga o‘tish</a>
+    <header class="site-header" id="site-header">
+      <div class="shop-brand-group">
+        <button class="menu-toggle icon-button" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menyuni ochish" title="Menyu"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#menu" /></svg></button>
+        <a class="brand" href="/" aria-label="NeoSport bosh sahifasi">
+          <picture><source srcset="/assets/neosport-mark.webp" type="image/webp" /><img src="/assets/neosport-mark.png" alt="" width="480" height="540" /></picture>
+          <span>NEO<span>SPORT</span></span>
+        </a>
+      </div>
+      <p class="header-caption">Sport va kundalik uslub</p>
+      <div class="header-actions">
+        <div class="account" id="account" data-next="" hidden></div>
+        <button class="cart-toggle" type="button" aria-controls="cart-drawer" aria-label="Savatchani ochish, 0 ta mahsulot"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#shopping-bag" /></svg><span>Savatcha</span><b class="cart-count" aria-hidden="true">0</b></button>
+      </div>
+    </header>
+    <div class="shop-layout">
+      <button class="menu-backdrop" type="button" data-menu-close aria-label="Menyuni yopish" hidden></button>
+      <aside class="shop-sidebar" id="site-nav" aria-label="Do‘kon navigatsiyasi">
+        <div class="sidebar-mobile-head"><strong>Menyu</strong><button class="icon-button" type="button" data-menu-close aria-label="Menyuni yopish" title="Yopish"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#x" /></svg></button></div>
+        <p class="sidebar-label">DO‘KON</p>
+        <nav class="sidebar-nav" aria-label="Asosiy navigatsiya">
+          <a href="/shop"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#layout-grid" /></svg>Katalog</a>
+          <a href="/"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#house" /></svg>Bosh sahifa</a>
+          <a href="/#store"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#map-pin" /></svg>Do‘kon manzili</a>
+        </nav>
+        <div class="sidebar-bottom">
+          <p class="sidebar-label">BIZ BILAN BOG‘LANING</p>
+          <a class="sidebar-contact" href="https://www.instagram.com/neosport_namangan/" target="_blank" rel="noopener noreferrer" data-analytics-location="footer" data-analytics-destination="instagram"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#instagram" /></svg><span>Instagram<small>@neosport_namangan</small></span><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#arrow-up-right" /></svg></a>
+          <div class="sidebar-location"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#map-pin" /></svg><span>Namangan, O‘zbekiston</span></div>
+        </div>
+      </aside>
+      <main id="main">
+        <nav class="product-breadcrumb" aria-label="Yo‘nalish">
+          <a href="/shop"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#arrow-right" /></svg>Katalogga qaytish</a>
+        </nav>
+        <!-- Rendered from /api/products?id=<id>; the id comes from this page's
+             own URL, so a shared or refreshed link loads the right product. -->
+        <section class="product-detail" id="product-detail" aria-busy="true" aria-live="polite">
+          <div class="product-detail-loading" aria-hidden="true"><div></div><span></span><span></span><span></span></div>
+        </section>
+      </main>
+      <div id="desktop-cart-slot"></div>
+    </div>
+    <footer class="site-footer"><p>NEOSPORT · NAMANGAN</p><div class="footer-links"></div><small>© <span id="year"></span> NeoSport</small></footer>
+    <script defer src="/_vercel/insights/script.js"></script>
+    <script src="/storefront-ui.js"></script>
+    <script src="/telegram-login.js"></script>
+    <script src="/script.js"></script>
+  </body>
+</html>

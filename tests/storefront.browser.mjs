@@ -77,8 +77,12 @@ try {
     await page.locator(".category-chip").filter({ hasText: product.category }).click();
     assert.equal(await page.locator(".catalog-card").count(), products.filter(p => p.category === product.category).length);
     await page.locator("#reset-filters").click();
+    await page.locator("#catalog-sort").selectOption("price-desc");
+    assert.equal(await page.locator(".catalog-card-action").first().getAttribute("href"), `/products/${[...products].sort((a,b) => b.finalPrice-a.finalPrice)[0].id}`);
+    await page.locator("#catalog-sort").selectOption("name");
+    assert.equal(await page.locator(".catalog-card-action").first().getAttribute("href"), `/products/${[...products].sort((a,b) => a.name.localeCompare(b.name,"uz",{numeric:true}))[0].id}`);
     await page.locator("#catalog-sort").selectOption("price-asc");
-    assert.equal(await page.locator(".catalog-card-action").first().getAttribute("data-open-product"), [...products].sort((a,b) => a.finalPrice-b.finalPrice)[0].id);
+    assert.equal(await page.locator(".catalog-card-action").first().getAttribute("href"), `/products/${[...products].sort((a,b) => a.finalPrice-b.finalPrice)[0].id}`);
 
     if (width < 768) {
       await page.locator(".menu-toggle").click();
@@ -94,25 +98,63 @@ try {
     assert.equal(await page.locator(".catalog-card").count(), products.filter(p => p.sizes.includes(product.sizes[0])).length);
     await page.locator("#reset-filters").click();
 
-    const trigger = page.locator(`.catalog-card-action[data-open-product="${product.id}"]`);
+    // The card is a link: image, title and action all address the same page,
+    // and every product's address is its own.
+    const address = `/products/${product.id}`;
+    for (const selector of [".catalog-card-trigger", ".catalog-card-name a", ".catalog-card-action"]) {
+      assert.equal(await page.locator(`.catalog-card`).first().locator(selector).getAttribute("href"), `/products/${products[0].id}`);
+    }
+    assert.equal(new Set(await page.locator(".catalog-card-action").evaluateAll(links => links.map(link => link.getAttribute("href")))).size, products.length);
+    assert.equal(await page.locator(".product-modal, [data-open-product]").count(), 0, "the popup is gone");
+
+    const trigger = page.locator(`.catalog-card-action[href="${address}"]`);
     await trigger.click();
-    await page.locator(".product-modal.is-open").waitFor();
-    assert.equal(await page.locator(".product-modal-close").evaluate(el => el === document.activeElement), true);
-    await page.keyboard.press("Shift+Tab");
-    assert.equal(await page.locator("#product-modal").evaluate(el => el.contains(document.activeElement)), true);
+    await page.waitForURL(`${base}${address}`);
+    await page.locator(".pdp").waitFor();
+    assert.equal(await page.locator("#product-name").innerText(), product.name);
+    assert.equal(await page.title(), `${product.name} — NeoSport`);
+    await assertNoOverflow(page);
     await page.locator(".shop-add-button").dispatchEvent("click");
     assert.equal(await page.locator(".cart-item").count(), 0);
-    assert.match(await page.locator("#modal-form-status").innerText(), /o‘lchamni tanlang/);
+    assert.match(await page.locator("#product-form-status").innerText(), /o‘lchamni tanlang/);
     await page.locator('input[name="size"]').first().check();
     if (product.images.length > 1) {
       await page.locator(".pdp-thumb").nth(1).click();
-      assert.equal(await page.locator("#modal-product-image").getAttribute("src"), product.images[1]);
+      assert.equal(await page.locator("#product-image").getAttribute("src"), product.images[1]);
       assert.equal(await page.locator(".pdp-thumb").nth(1).getAttribute("aria-pressed"), "true");
     }
-    if (width === 390 || width === 1440) await capture(page, { path: `${output}product-${width}.png` });
-    await page.keyboard.press("Escape");
-    assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
-    await trigger.click();
+    if (width === 390 || width === 1440) await capture(page, { path: `${output}product-${width}.png`, fullPage: true });
+
+    // A share is a plain GET with no script: the head has to name the product
+    // before the browser ever runs, or a link preview shows the generic shop.
+    const shared = await context.request.get(`${base}${address}`);
+    const head = await shared.text();
+    assert.equal(shared.status(), 200);
+    assert.equal(head.match(/<title>([^<]*)<\/title>/)[1], `${product.name} — NeoSport`);
+    assert.match(head, new RegExp(`<meta property="og:url" content="[^"]*${address}"`));
+    assert.ok(head.match(/<meta property="og:image" content="(https?:\/\/[^"]+)"/), "og:image is a whole address");
+    assert.equal((await context.request.get(`${base}/products/product-0000ffff-0000-ffff-0000-ffff0000ffff`)).status(), 404);
+
+    // The address alone is enough: a refresh, a direct visit and a share all
+    // land on the same product, and an unknown one says so.
+    await page.reload({ waitUntil: "networkidle" });
+    assert.equal(await page.locator("#product-name").innerText(), product.name);
+    if (products.length > 1) {
+      await page.goto(`${base}/products/${products[1].id}`, { waitUntil: "networkidle" });
+      assert.equal(await page.locator("#product-name").innerText(), products[1].name);
+    }
+    await page.goto(`${base}/products/product-0000ffff-0000-ffff-0000-ffff0000ffff`, { waitUntil: "networkidle" });
+    await page.locator(".product-missing").waitFor();
+    if (width === 390 || width === 1440) await capture(page, { path: `${output}product-missing-${width}.png` });
+
+    // Back through the visited products returns to the catalog.
+    await page.goBack({ waitUntil: "networkidle" });
+    if (products.length > 1) await page.goBack({ waitUntil: "networkidle" });
+    await page.goBack({ waitUntil: "networkidle" });
+    await page.waitForURL(`${base}/shop`);
+    await page.locator(".catalog-card").first().waitFor();
+
+    await page.goto(`${base}${address}`, { waitUntil: "networkidle" });
     await page.locator('input[name="size"]').first().check();
     await page.locator('[data-quantity-action="increase"]').click();
     await page.locator(".shop-add-button").click();
@@ -125,11 +167,9 @@ try {
     await page.locator('[data-cart-action="decrease"]').click();
     await assertNoOverflow(page);
     if (width === 390 || width === 1440) await capture(page, { path: `${output}cart-${width}.png` });
-    if (width < 1200) {
-      await page.keyboard.press("Escape");
-      assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
-    }
-    await page.reload({ waitUntil: "networkidle" });
+    if (width < 1200) await page.keyboard.press("Escape");
+    await page.goto(`${base}/shop`, { waitUntil: "networkidle" });
+    await page.locator(".catalog-card").first().waitFor();
     if (width < 1200) await page.locator(".cart-toggle").click();
     assert.equal(await page.locator(".cart-quantity span").textContent(), "2");
     await page.locator("#checkout-button").click();
@@ -182,7 +222,7 @@ try {
     await page.locator('[data-cart-action="remove"]').click();
     assert.equal(await page.locator(".cart-item").count(), 0);
     assert.deepEqual(errors, []);
-    results.push({ width, status: "passed", realProducts: products.length, checks: "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage" });
+    results.push({ width, status: "passed", realProducts: products.length, checks: "layout, images, search, category, size, sorting, keyboard, product page links, server-rendered share metadata, direct URL, refresh, back navigation, not found, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage" });
     console.log(JSON.stringify(results.at(-1)));
     await context.close();
   }
@@ -248,6 +288,62 @@ try {
   assert.match(await page.locator("#catalog-empty").innerText(), /Hozircha mahsulot yo‘q/);
   assert.doesNotMatch(await page.locator("#catalog-empty").innerText(), /admin/i);
   results.push({ status: "passed", checks: "catalog loading, error, retry, empty, saved cart retained after fetch failure, long cart, responsive cart transitions, short viewport input focus, 320px single column, isolated nine-product grid" });
+  const signed = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+  await signed.route("**/api/order", route => route.abort());
+  await signed.route("**/_vercel/insights/**", route => route.fulfill({ body: "", contentType: "text/javascript" }));
+
+  // Two customers behind one browser. The account the shop is told about and
+  // the history it is given always belong to the same person, so anything from
+  // the other one appearing on the page is a leak.
+  const accounts = {
+    anvar: { user: { name: "Anvar", phone: "998901111111", role: "customer" }, orders: [{ id: "SINOV-ANVAR", createdAt: "2026-09-08T09:00:00Z", total: preview[0].finalPrice, items: [{ name: preview[0].name, color: preview[0].colors[0].label, size: preview[0].sizes[0], quantity: 1 }] }] },
+    bekzod: { user: { name: "Bekzod", phone: "998902222222", role: "customer" }, orders: [{ id: "SINOV-BEKZOD", createdAt: "2026-09-09T09:00:00Z", total: preview[0].finalPrice, items: [{ name: preview[0].name, color: preview[0].colors[0].label, size: preview[0].sizes[0], quantity: 2 }] }] },
+    none: { user: null, orders: null },
+  };
+  let signedIn = "anvar";
+  await signed.route("**/api/auth/me", route => route.fulfill({ json: { user: accounts[signedIn].user, googleEnabled: true, telegramEnabled: false } }));
+  await signed.route("**/api/orders**", route => accounts[signedIn].orders
+    ? route.fulfill({ json: { orders: accounts[signedIn].orders } })
+    : route.fulfill({ status: 401, json: { ok: false, message: "Kiring." } }));
+
+  const signedPage = await signed.newPage();
+  await signedPage.goto(`${base}/shop`, { waitUntil: "networkidle" });
+  await signedPage.locator(".account-order").waitFor();
+  assert.equal(await signedPage.locator('#checkout-form [name="name"]').inputValue(), "Anvar");
+  assert.equal(await signedPage.locator('#checkout-form [name="phone"]').inputValue(), "+998 90 111 11 11");
+  assert.match(await signedPage.locator("#account-orders-body").innerText(), /SINOV-ANVAR/);
+  assert.equal(await signedPage.locator('a[href="/admin"]').count(), 0);
+
+  // Signing out empties the section rather than leaving the last customer's
+  // orders behind for whoever opens the page next.
+  signedIn = "none";
+  await signedPage.reload({ waitUntil: "networkidle" });
+  await signedPage.waitForFunction(() => document.querySelector("#account-orders").hidden);
+  assert.equal(await signedPage.locator(".account-order").count(), 0);
+
+  signedIn = "bekzod";
+  await signedPage.reload({ waitUntil: "networkidle" });
+  await signedPage.locator(".account-order").waitFor();
+  const afterSwitch = await signedPage.locator("#account-orders-body").innerText();
+  assert.match(afterSwitch, /SINOV-BEKZOD/);
+  assert.doesNotMatch(afterSwitch, /SINOV-ANVAR/, "the previous customer's history must not survive the switch");
+  assert.equal(await signedPage.locator('#checkout-form [name="name"]').inputValue(), "Bekzod");
+
+  // Neither does going back to a shop page the previous customer had open:
+  // the restored page re-reads the session before it shows anything.
+  await signedPage.goto(`${base}/products/${preview[0].id}`, { waitUntil: "networkidle" });
+  signedIn = "anvar";
+  accounts.anvar.orders = [];
+  await signedPage.goBack({ waitUntil: "networkidle" });
+  await signedPage.waitForURL(`${base}/shop`);
+  await signedPage.waitForFunction(() => document.querySelector("#account-orders-body")?.innerText.includes("Hali buyurtma bermagansiz"));
+  assert.doesNotMatch(await signedPage.locator("#account-orders-body").innerText(), /SINOV-BEKZOD/);
+
+  await signedPage.goto(`${base}/shop`, { waitUntil: "networkidle" });
+  await signedPage.waitForFunction(() => document.querySelector("#account-orders-body").innerText.includes("Hali buyurtma bermagansiz"));
+  await assertNoOverflow(signedPage);
+  await signed.close();
+  results.push({ status: "passed", checks: "authenticated name/phone prefill, order history and empty history, customer has no admin link, order history cleared on sign-out, account switch and back navigation" });
   writeFileSync(`${output}results.json`, JSON.stringify(results, null, 2) + "\n");
   console.log("All storefront browser checks passed. No order reached the server.");
 } finally { await browser.close(); }

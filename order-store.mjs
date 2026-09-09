@@ -63,6 +63,26 @@ export const saveOrder = async (order, environment = process.env) => {
   await writeFile(localOrdersFile, `${JSON.stringify(orders.slice(0, LOCAL_ORDER_LIMIT), null, 2)}\n`, "utf8");
 };
 
+// A single order, looked up by its id. The caller decides who may see it:
+// this returns the row exactly as stored, owner and all.
+export const getOrder = async (id, environment = process.env) => {
+  const orderId = String(id || "");
+  if (!orderId) return null;
+  const config = supabaseConfig(environment);
+
+  if (config) {
+    const rows = await supabaseRequest(
+      config,
+      `/rest/v1/orders?select=*&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+      { headers: { Accept: "application/json" } },
+    );
+    return rows?.[0] ? normalizeOrder(rows[0]) : null;
+  }
+
+  const orders = await readLocalOrders();
+  return orders.find((order) => order.id === orderId) || null;
+};
+
 export const listOrders = async (environment = process.env, { limit = 500, userId = null } = {}) => {
   const config = supabaseConfig(environment);
   const size = Math.min(1000, Math.max(1, limit));

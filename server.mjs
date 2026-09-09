@@ -7,6 +7,7 @@ import adminProductsHandler from "./api/admin/products.mjs";
 import adminStatsHandler from "./api/admin/stats.mjs";
 import authHandler from "./api/auth.mjs";
 import orderHandler from "./api/order.mjs";
+import productPageHandler, { PRODUCT_PATH } from "./api/product-page.mjs";
 import ordersHandler from "./api/orders.mjs";
 import productsHandler from "./api/products.mjs";
 import telegramWebhookHandler from "./api/telegram/webhook.mjs";
@@ -73,7 +74,14 @@ createServer(async (request, response) => {
     "/api/admin/products": adminProductsHandler,
     "/api/admin/stats": adminStatsHandler,
     "/api/telegram/webhook": telegramWebhookHandler,
-  }[pathname] || (pathname.startsWith("/api/auth/") ? authHandler : undefined);
+  }[pathname] ||
+    (pathname.startsWith("/api/auth/") ? authHandler : undefined) ||
+    // Vercel rewrites /api/orders/<id> to a query; locally the path is served
+    // by the same handler, which reads the id from either shape.
+    (pathname.startsWith("/api/orders/") ? ordersHandler : undefined) ||
+    // Every product has its own page. The document is the same one for all of
+    // them, but its sharing metadata is filled in per product on the server.
+    (PRODUCT_PATH.test(pathname) ? productPageHandler : undefined);
 
   if (apiHandler) {
     try {

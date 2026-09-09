@@ -13,7 +13,44 @@ The local server runs at `http://localhost:4173` by default.
 
 Onlayn do‘kon: `http://localhost:4173/shop`
 
+Mahsulot sahifasi: `http://localhost:4173/products/<id>`
+
 Admin panel: `http://localhost:4173/admin`
+
+### Do‘kon sahifalari
+
+| Manzil | Hujjat | Vazifa | So‘rovlari |
+| --- | --- | --- | --- |
+| `/` | `index.html` · `script.js` | Bosh sahifa va qisqa katalog | `/api/products`, `/api/auth/me` |
+| `/shop` | `shop.html` · `script.js` | To‘liq katalog, savatcha, buyurtmalarim | `+ /api/orders` |
+| `/products/<id>` | `product.html` · `api/product-page.mjs` · `script.js` | Bitta mahsulot sahifasi | `/api/products?id=<id>` |
+
+Boshqa sahifalardan farqli o‘laroq, mahsulot sahifasini **funksiya** qaytaradi: `api/product-page.mjs` `product.html` ni o‘qiydi, `<head>` ichidagi sarlavha, tavsif, rasm va manzilni shu mahsulotniki bilan almashtiradi va shu hujjatni yuboradi. Brauzer keyin mahsulotni odatdagidek o‘zi yuklaydi. Sabab: **Telegram va Instagram havola ko‘rinishini tayyorlaganda skriptni ishga tushirmaydi** — metama’lumot serverda to‘ldirilmasa, ulashilgan har bir mahsulot bir xil umumiy ko‘rinishda chiqadi. Do‘konning asosiy kanali shu ikkisi bo‘lgani uchun bu muhim.
+
+Shu sababli marshrut uchta joyda qayd etiladi: `server.mjs` (`PRODUCT_PATH` → `productPageHandler`), `vercel.json` dagi `rewrites` (`/products/(...)` → `/api/product-page?id=$1`) va `build.mjs` dagi `files`. `vercel.json` dagi `functions.includeFiles` `product.html` ni funksiya bilan birga joylaydi, aks holda u runtime’da topilmaydi. `preview-static.mjs` ga qo‘shish shart emas — bu manzil statik fayl darvozasiga umuman yetib bormaydi.
+
+Bitta hujjat barcha mahsulotlarga xizmat qiladi; qaysi mahsulot ekanini faqat manzildagi `id` hal qiladi. Mavjud bo‘lmagan yoki nofaol mahsulot **404** qaytaradi (sahifaning o‘zi baribir ko‘rsatiladi), katalog ishlamay qolsa esa sahifa **200** bilan keladi va skript qayta urinadi. `og:image` va `og:url` uchun to‘liq manzil kerak: u `SITE_URL` dan, u yo‘q bo‘lsa so‘rov host’idan olinadi.
+
+> Vercel Hobby rejasida 12 tagacha Serverless Function bo‘lishi mumkin. `api/` hozir 10 tasini ishlatadi.
+
+### Admin sahifalari
+
+Har bir boshqaruv vazifasi o‘z manzili va o‘z hujjatiga ega. Sahifa yuklanganda faqat o‘sha vazifaga kerakli so‘rov yuboriladi.
+
+| Manzil | Hujjat / skript | Vazifa | So‘rovlari |
+| --- | --- | --- | --- |
+| `/admin` | `admin.html` · `admin-stats.js` | Statistika | `/api/admin/stats` |
+| `/admin/categories` | `admin-categories.html` · `admin-categories.js` | Kategoriyalar | `/api/admin/categories`, `/api/admin/products` |
+| `/admin/products` | `admin-products.html` · `admin-products.js` | Katalog ro‘yxati | `/api/admin/products` |
+| `/admin/product` | `admin-product.html` · `admin-product.js` | Mahsulot qo‘shish | `/api/admin/categories` |
+| `/admin/product?id=<id>` | yuqoridagi | Mahsulotni tahrirlash | `+ /api/admin/products` |
+| `/admin/customers` | `admin-customers.html` · `admin-customers.js` | Mijozlar | `/api/admin/customers` |
+
+Umumiy qism — sarlavha, menyu, kirish darvozasi, `apiRequest()` va formatlash yordamchilari — `admin-shell.js` da; sahifa skriptlari uni ES modul sifatida import qiladi. Kategoriyalar sahifasi mahsulotlarni ham yuklaydi, chunki ishlatilayotgan kategoriyani o‘chirishdan himoya shunga tayanadi; mahsulot formasi kategoriyalarga tayanadi, chunki o‘lcham to‘plami kategoriya turidan kelib chiqadi.
+
+Eski `#stats`, `#categories`, `#products`, `#editor`, `#customers` xatcho‘plari `/admin` da tegishli sahifaga o‘zi yo‘naltiriladi.
+
+Yangi admin sahifasi qo‘shilsa, u **to‘rt joyda** ham qayd etilishi shart: `server.mjs` dagi `pageFile`, `vercel.json` dagi `rewrites`, `preview-static.mjs` dagi `publicPaths` va `build.mjs` dagi `files`. Bittasi unutilsa xatolik faqat ishga tushirishda ko‘rinadi, shuning uchun buni test tekshiradi.
 
 ## Environment variables
 
@@ -34,6 +71,8 @@ Lokal rejimda Supabase qiymatlari bo‘lmasa mahsulotlar `data/products.json` va
 ## Katalog
 
 Katalog bo‘sh holatdan boshlanadi — saytda birorta ham hardcoded mahsulot yo‘q. Har bir mahsulot admin panel (`/admin`) orqali qo‘shiladi va `/api/products` orqali do‘kon sahifasiga chiqadi. Katalog bo‘sh bo‘lsa, do‘kon sahifasi va admin ro‘yxati o‘zining bo‘sh holat matnini ko‘rsatadi. Mahsulot rasmlari repoda saqlanmaydi: production’da Supabase Storage’ga, lokalda `assets/uploads/` ichiga yuklanadi.
+
+Har bir mahsulotning o‘z doimiy manzili bor: `/products/<id>`. Kartochkadagi rasm, nom va «Tanlash» tugmasi — oddiy havolalar, shuning uchun mahsulotni yangi tabda ochish, havolasini ulashish va xatcho‘pga qo‘yish mumkin. Sahifa faqat manzildagi `id` asosida `GET /api/products?id=<id>` so‘rovi bilan yuklanadi: katalogdan o‘tish shart emas, sahifani yangilash yoki havolani boshqa brauzerda ochish ham xuddi shunday ishlaydi. Yuklanayotgan, topilmagan va xatolik holatlarining har biri o‘z ko‘rinishiga ega; nofaol mahsulot mijoz uchun mavjud emas kabi ko‘rinadi. Rang, o‘lcham, soni va savatchaga qo‘shish — hammasi shu sahifada.
 
 Admin panelda mahsulot qo‘shish, tahrirlash, faol/nofaol qilish va chegirma e’lon qilish mumkin. Har bir mahsulotga **10 tagacha rasm** yuklash mumkin; birinchisi asosiy hisoblanadi va katalog kartochkasida ko‘rinadi, qolganlari mahsulot oynasida kichik rasmlar sifatida chiqadi. Adminda rasmlarni o‘chirish va istalganini asosiy qilish mumkin. Yuklangan rasm serverda qayta kodlanadi: eni 1280px gacha kichraytiriladi va WebP’ga o‘giriladi (odatda 80%+ hajm kamayadi), shuning uchun katta fotosurat yuklashdan tortinmang. Mahsulot o‘chirilganda yoki galereyadan olib tashlanganda fayl Storage’dan ham o‘chadi. Chegirma foizda kiritiladi (0–90%); yakuniy narx eng yaqin 1000 so‘mga yaxlitlanadi va butun zanjir — do‘kon, savatcha, `/api/order`, Telegram xabari — shu narxdan foydalanadi.
 
@@ -95,7 +134,17 @@ Yangilanish avval boshlangan, imzosiz `ns_tg` urinishlarini bekor qiladi; ular q
 
 ## Statistika
 
-`/admin` sahifasining birinchi bloki `GET /api/admin/stats` dan ma’lumot oladi: bugun / 7 kun / 30 kun / jami kesimida buyurtmalar soni va summasi, eng ko‘p sotilgan mahsulotlar, oxirgi buyurtmalar, hamda katalog kesimi (faol/nofaol, chegirmadagilar, katalog qiymati, brend va kategoriyalar).
+`/admin` — panelning bosh sahifasi; u `GET /api/admin/stats` dan ma’lumot oladi: bugun / 7 kun / 30 kun / jami kesimida buyurtmalar soni va summasi, eng ko‘p sotilgan mahsulotlar, oxirgi buyurtmalar, hamda katalog kesimi (faol/nofaol, chegirmadagilar, katalog qiymati, brend va kategoriyalar).
+
+### Buyurtmalar mijozlarga bo‘linadi
+
+Har bir buyurtmaning noyob raqami (`NS-…`) bor va u buyurtma bergan hisobga `user_id` orqali bog‘lanadi. Mijoz **faqat o‘z** buyurtmalarini ko‘radi:
+
+- `GET /api/orders` — ro‘yxat. Faqat sessiya cookie’sidagi hisob bo‘yicha filtrlanadi; brauzer yuborgan hech qanday parametr bunga ta’sir qilmaydi.
+- `GET /api/orders/<id>` (Vercel’da `/api/orders?id=<id>` ga rewrite qilinadi) — bitta buyurtma. Server buyurtmani topib, uni sessiyadagi hisob bilan solishtiradi. Boshqa mijozning raqamini kiritish **404** beradi — mavjud bo‘lmagan raqam bilan bir xil javob, ya’ni endpoint orqali raqamlarni topib bo‘lmaydi. Kirmasdan berilgan buyurtma hech kimga tegishli emas va hech kimga ochilmaydi.
+- Admin huquqi saqlanadi: rol har so‘rovda `ADMIN_EMAILS` / `ADMIN_PHONES` dan qayta hisoblanadi, cookie’dan olinmaydi.
+
+Javoblar `Cache-Control: no-store` va `Vary: Cookie` bilan qaytadi. Sahifa tomonida ham hisob almashsa yoki chiqib ketilsa, oldingi mijozning buyurtmalari darhol tozalanadi — sahifa orqaga qaytishdan tiklansa ham (`pageshow`) sessiya qaytadan o‘qiladi.
 
 Buyurtmalar `orders` jadvalida (lokalda `data/orders.json` da) saqlanadi. Bu fayl mijoz ismi va telefon raqamini saqlagani uchun `.gitignore` da. Jadval hali yaratilmagan bo‘lsa statistika katalog qismini ko‘rsatishda davom etadi.
 

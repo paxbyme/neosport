@@ -379,7 +379,7 @@ export const updateProduct = async (id, input, environment = process.env) => {
 
   // An edit that sends no image at all keeps the gallery untouched; sending a
   // list replaces it, and every photo dropped from it is deleted afterwards.
-  const previous = submitted.length ? await findProduct(id, environment) : null;
+  const previous = submitted.length ? await getProduct(id, environment) : null;
   if (previous === null && submitted.length) throw new ProductError("Mahsulot topilmadi.", 404);
   const images = submitted.length ? await saveImages(submitted, id, environment) : null;
 
@@ -416,7 +416,9 @@ export const setProductActive = async (id, active, environment = process.env) =>
   return patchLocalProduct(id, (existing) => ({ ...existing, active: Boolean(active), updatedAt }));
 };
 
-const findProduct = async (id, environment) => {
+// One product by id, active or not. The public endpoint hides the inactive
+// ones itself; the admin paths below need to see them.
+export const getProduct = async (id, environment = process.env) => {
   const config = supabaseConfig(environment);
   if (config) {
     const rows = await requestSupabase(config, `/rest/v1/products?select=*&id=eq.${encodeURIComponent(id)}&limit=1`, {
@@ -431,7 +433,7 @@ const findProduct = async (id, environment) => {
 export const deleteProduct = async (id, environment = process.env) => {
   if (!id) throw new ProductError("Mahsulot tanlanmadi.");
   const config = supabaseConfig(environment);
-  const product = await findProduct(id, environment);
+  const product = await getProduct(id, environment);
 
   if (config) {
     await requestSupabase(config, `/rest/v1/products?id=eq.${encodeURIComponent(id)}`, {

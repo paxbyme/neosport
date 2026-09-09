@@ -3,31 +3,31 @@
     "width": 360,
     "status": "passed",
     "realProducts": 2,
-    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+    "checks": "layout, images, search, category, size, sorting, keyboard, product page links, server-rendered share metadata, direct URL, refresh, back navigation, not found, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
   },
   {
     "width": 390,
     "status": "passed",
     "realProducts": 2,
-    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+    "checks": "layout, images, search, category, size, sorting, keyboard, product page links, server-rendered share metadata, direct URL, refresh, back navigation, not found, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
   },
   {
     "width": 768,
     "status": "passed",
     "realProducts": 2,
-    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+    "checks": "layout, images, search, category, size, sorting, keyboard, product page links, server-rendered share metadata, direct URL, refresh, back navigation, not found, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
   },
   {
     "width": 1024,
     "status": "passed",
     "realProducts": 2,
-    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+    "checks": "layout, images, search, category, size, sorting, keyboard, product page links, server-rendered share metadata, direct URL, refresh, back navigation, not found, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
   },
   {
     "width": 1440,
     "status": "passed",
     "realProducts": 2,
-    "checks": "layout, images, search, category, size, sorting, keyboard, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
+    "checks": "layout, images, search, category, size, sorting, keyboard, product page links, server-rendered share metadata, direct URL, refresh, back navigation, not found, gallery, required selections, quantity, cart persistence, removal, intercepted checkout, auth links, homepage"
   },
   {
     "status": "passed",

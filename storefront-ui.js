@@ -1,14 +1,9 @@
 // Shared shopping surfaces keep the same checkout and variant flow on both pages.
-const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="assets/icons.svg#${name}" /></svg>`;
+// Absolute, because /products/<id> is one path segment deeper than the pages
+// this markup was first written for.
+const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#${name}" /></svg>`;
 
 document.body.insertAdjacentHTML("beforeend", `
-  <div class="product-modal" id="product-modal" hidden>
-    <button class="product-modal-backdrop" type="button" data-modal-close aria-label="Oynani yopish" tabindex="-1"></button>
-    <div class="product-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-product-name" tabindex="-1">
-      <button class="product-modal-close icon-button" type="button" data-modal-close aria-label="Oynani yopish" title="Yopish">${icon("x")}</button>
-      <div class="product-modal-body" id="product-modal-body"></div>
-    </div>
-  </div>
   <div class="cart-layer" id="cart-layer" hidden>
     <button class="cart-backdrop" type="button" data-cart-close aria-label="Savatchani yopish" tabindex="-1"></button>
     <aside class="cart-drawer" id="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" tabindex="-1">

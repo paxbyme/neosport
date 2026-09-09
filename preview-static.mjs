@@ -15,11 +15,13 @@ const publicPaths = new Set([
   "/admin-products.js",
   "/admin-product.js",
   "/admin-customers.js",
-  "/", "/shop", "/admin", "/index.html", "/shop.html", "/admin.html",
+  "/", "/shop", "/admin", "/index.html", "/shop.html", "/admin.html", "/product.html",
   "/styles.css", "/landing.css", "/shop.css", "/admin.css", "/telegram-login.css",
   "/script.js", "/storefront-ui.js", "/telegram-login.js",
 ]);
 
+// /products/<id> never reaches this gate: api/product-page.mjs answers it and
+// reads the document itself, so only the plain file stays in the list above.
 export const isPublicPreviewPath = pathname => {
   if (pathname.includes("\\") || pathname.includes("\0") || pathname.split("/").some(part => part.startsWith("."))) return false;
   return publicPaths.has(pathname) || pathname.startsWith("/assets/") || pathname.startsWith("/docs/ui-review/");
